@@ -1,0 +1,7 @@
+-nbangles_coarse 8
+-nsigmas_coarse 2.2
+-nsigmas_fine 2.5
+-neighb_weight 0.5
+-tuning_neighb 0.6
+-sigma1_ratio 0.2
+-num_threads 8

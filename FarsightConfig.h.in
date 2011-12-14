@@ -1,0 +1,9 @@
+//Configuration file for Farsight.
+//Farsight-wide defines and other configuration information
+//CMAKE will convert the file into a .h file and put it in 
+// the binary directory.
+
+//#cmakedefine BUILD_GUI
+//#cmakedefine BUILD_NUCLEI
+//#cmakedefine BUILD_CHARLENE
+//#cmakedefine USE_LIBSVM
