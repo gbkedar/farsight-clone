@@ -308,8 +308,218 @@ bool ProjectProcessor::SegmentNuclei(int nucChannel)
 //***********************************************************************************************************
 //  NUCLEAR SEGMENTATION FOR MONTAGES
 //***********************************************************************************************************
+void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
+{
+  std::cout<<"Using Montage Segmentation\n";
+  typedef itk::ConnectedComponentImageFilter< InputImageType1, LabelImageType1 > ConnectedComponentFilterType;
+
+  itk::SizeValueType Default3dSize = 268435456;	//256MB
+  itk::SizeValueType TileSize = 400;	//Default tile size for 2D
+  unsigned MaxScale = 50; //Default padding around connected components for resegmentation
+			  //Also the default overlap between tiles when binarizing
+  const Image::Info *info = inputImage->GetImageInfo();
+  itk::SizeValueType numStacks = info->numZSlices;  //z-direction
+  itk::SizeValueType numRows = info->numRows;	    //y-direction
+  itk::SizeValueType numColumns = info->numColumns; //x-direction
+  itk::SizeValueType numTSlices = info->numTSlices; //t-direction
+
+  itk::SizeValueType TimePointSize = numStacks*numRows*numColumns;
+  InputImageType1::Pointer InputImage = inputImage->GetItkPtr<unsigned char>
+							(0,nucChannel,ftk::Image::DEFAULT);
+
+  //Compute tile-size for binarization keep 400 to be the min in any dimension
+  if( numStacks!=1 ){
+    TileSize = 2;
+    while( (TileSize*TileSize*numStacks) < Default3dSize )
+      TileSize = TileSize*2;
+    TileSize = TileSize/2;
+  }
+  itk::SizeValueType NumHorizontalTiles, NumVerticalTiles;
+  NumHorizontalTiles = ceil(((double)numColumns)/((double)TileSize));
+  NumVerticalTiles   = ceil(((double)numRows)/((double)TileSize));
+  ConnectedComponentFilterType::Pointer ComponentFilter = ConnectedComponentFilterType::New();
+  //Step 1: Binarize the images
+{ //Scoping for binary image
+  //Start by allocating memory for the binary image
+  InputImageType1::Pointer BinaryImage = InputImageType1::New();
+  InputImageType1::IndexType BinStart;
+  BinStart[0] = BinStart[1] = BinStart[2]  = 0;
+  InputImageType1::SizeType BinSize;
+  BinSize[0] = numColumns;
+  BinSize[1] = numRows;
+  BinSize[2] = numStacks;
+  InputImageType1::RegionType BinRegion;
+  BinRegion.SetSize ( BinSize );
+  BinRegion.SetIndex( BinStart );
+  BinaryImage->SetRegions( BinRegion );
+  BinaryImage->Allocate();
+  BinaryImage->FillBuffer(0);
+  BinaryImage->Update();
+
+#ifdef _OPENMP
+  //Use 95% of the cores by default n save a little for the OS
+  if(!numThreadsSet) n_thr = 0.95*omp_get_max_threads();
+  itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
+  std::cout<<"Using "<<n_thr<<" threads\n"<<std::flush;
+#if _OPENMP > 200805L
+  omp_set_max_active_levels(1);
+  #pragma omp parallel for num_threads(n_thr) collapse(2)
+  for( itk::SizeValueType i=0; i<NumVerticalTiles; ++i )
+#else
+  #pragma omp parallel for num_threads(n_thr)
+  for( itk::IndexValueType i=0; i<NumVerticalTiles; ++i )
+#endif
+#else
+  for( itk::SizeValueType i=0; i<NumVerticalTiles; ++i )
+#endif
+    for( itk::SizeValueType j=0; j<NumHorizontalTiles; ++j )
+    {
+	std::cout<<"Binarizing tile "<< (i*NumVerticalTiles+j) <<" of "
+		 <<(NumVerticalTiles*NumHorizontalTiles)<<"\n";
+	InputImageType1::IndexType Start;
+	//Ensure that the last tile is big enough
+	Start[0] = (j*TileSize) < (numColumns-TileSize) ? (j*TileSize) : (numColumns-TileSize-1);
+	Start[1] = (i*TileSize) < (numRows   -TileSize) ? (i*TileSize) : (numRows   -TileSize-1);
+	Start[2] = 0;
+	InputImageType1::SizeType Size;
+	Size[0] = TileSize;
+	Size[1] = TileSize;
+	Size[2] = numStacks;
+	BinarizeTile( InputImage, BinaryImage, Start, Size );
+    }
+
+  //Compute CCs and save them
+#ifdef _OPENMP
+  itk::MultiThreader::SetGlobalMaximumNumberOfThreads(n_thr);
+#endif
+  std::cout<<"Computing Initial Lables\n"<<std::flush;
+  ComponentFilter->SetInput( BinaryImage );
+  ComponentFilter->SetFullyConnected( true );
+  try{ ComponentFilter->Update(); }
+  catch( itk::ExceptionObject & excp ){ std::cerr << excp << std::endl; }
+} //End scoping for binary image
+#ifdef _OPENMP
+  itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
+#endif
+  LabelImageType1::Pointer CCImage = ComponentFilter->GetOutput();
+  std::vector< std::string > SegOutFilenames;
+  std::vector< BBoxType > ILabelsBBoxes;
+  std::vector<LabelImageType1::PixelType> labelsList;
+  ILabelsBBoxes = ReSegmentCCs( InputImage, CCImage, SegOutFilenames, labelsList );
+}
+
+std::vector< ftk::ProjectProcessor::BBoxType > ProjectProcessor::ReSegmentCCs
+		( InputImageType1::Pointer InputImage, LabelImageType1::Pointer CCImage,
+		  std::vector< std::string >& SegOutFilenames,
+		  std::vector<LabelImageType1::PixelType>& labelsList ) 
+{
+  typedef itk::LabelStatisticsImageFilter< InputImageType1, LabelImageType1 > LabelStatisticsImageFilterType;
+  typedef LabelStatisticsImageFilterType::ValidLabelValuesContainerType ValidLabelValuesType;
+  std::vector< BBoxType > OutputBBoxes;
+#ifdef _OPENMP
+  itk::MultiThreader::SetGlobalMaximumNumberOfThreads(n_thr);
+#endif
+  LabelStatisticsImageFilterType::Pointer LabelStatisticsImageFilter = LabelStatisticsImageFilterType::New();
+  LabelStatisticsImageFilter->SetLabelInput( CCImage );
+  LabelStatisticsImageFilter->SetInput( InputImage );
+  LabelStatisticsImageFilter->UseHistogramsOff();
+  std::cout<<"Getting bounding boxes for initial CCs\n"<<std::flush;
+  try{ LabelStatisticsImageFilter->Update(); }
+  catch( itk::ExceptionObject & excp ){ std::cerr << excp << std::endl; }
+  std::cout<<"Found bounding boxes for initial CCs\n"<<std::flush;
+#ifdef _OPENMP
+  itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
+#endif
+  for( ValidLabelValuesType::const_iterator vIt=LabelStatisticsImageFilter->GetValidLabelValues().begin();
+       vIt != LabelStatisticsImageFilter->GetValidLabelValues().end();	++vIt )
+    if ( LabelStatisticsImageFilter->HasLabel(*vIt) )
+      if( *vIt ) //Skips 0 if present
+      {
+	 labelsList.push_back(*vIt);
+	 OutputBBoxes.push_back( LabelStatisticsImageFilter->GetBoundingBox(*vIt) );
+      }
+
+  //Create temp folder with boost
+
+  //Write images corresponding to CCs in the temp folder
+
+  //Segment images and write outputs
+
+  //Delete intensity image crops with boost
 
 
+  return OutputBBoxes;
+}
+
+void ProjectProcessor::BinarizeTile( InputImageType1::Pointer InputImage,
+  InputImageType1::Pointer BinaryImage, InputImageType1::IndexType Start, InputImageType1::SizeType Size )
+{
+  typedef itk::RegionOfInterestImageFilter< InputImageType1, InputImageType1 > ROIFilterType;
+  typedef itk::Image< unsigned short,  3 >  BinaryImageType;
+  typedef itk::ImageRegionConstIterator< BinaryImageType > BinOutConstIteratorType;
+  typedef itk::ImageRegionIteratorWithIndex< InputImageType1 > BinMontageIteratorType;
+
+  //Redefine some constants
+  itk::SizeValueType numStacks = Size[3];
+  itk::SizeValueType TileSize = Size[0];
+
+  //Crop Input Image
+  InputImageType1::RegionType CroppedRegionBin;
+  CroppedRegionBin.SetSize ( Size );
+  CroppedRegionBin.SetIndex( Start );
+  ROIFilterType::Pointer CropImageFilter = ROIFilterType::New();
+  CropImageFilter->SetInput( InputImage );
+  try{ CropImageFilter->Update(); }
+  catch( itk::ExceptionObject & excp ){ std::cerr << excp << std::endl; }
+
+  //Create binarization object
+  ftk::NuclearSegmentation * newNucSeg = new ftk::NuclearSegmentation();
+
+  //Read Parameters
+  for(int i=0; i<(int)definition->nuclearParameters.size(); ++i)
+    newNucSeg->SetParameter(	definition->nuclearParameters.at(i).name,
+				int(definition->nuclearParameters.at(i).value) );
+
+  //Convert input image to FTKImage
+  ftk::Image::Pointer FTKIImage = ftk::Image::New();
+  std::vector<unsigned char> color;
+  color.assign(3,255);
+  FTKIImage->AppendChannelFromData3D( (void*)CropImageFilter->GetOutput()->GetBufferPointer(),
+					itk::ImageIOBase::UCHAR, sizeof(unsigned char),
+					Size[0], Size[1], Size[2], "nuc", color, true);
+  newNucSeg->SetInput( FTKIImage, "nuc", 0 );
+
+  //Run Binarization
+  newNucSeg->Binarize(true);
+
+  //Get Output
+  ftk::Image::Pointer FTKOImage = newNucSeg->GetLabelImage();
+  BinaryImageType::Pointer BinIm = FTKOImage->
+					GetItkPtr< BinaryImageType::PixelType >( 0, 0, ftk::Image::DEFAULT );
+
+  BinOutConstIteratorType BinOutConstIter( BinIm, BinIm->GetLargestPossibleRegion() );
+  BinMontageIteratorType BinMontagIter( BinaryImage, BinaryImage->GetLargestPossibleRegion() );
+
+  //Copy output of tile into montage
+  for( itk::SizeValueType k=0; k<numStacks; ++k )
+    for( itk::SizeValueType l=Start[1]; l<(Start[1]+TileSize); ++l )
+      for( itk::SizeValueType m=Start[0]; m<(Start[0]+TileSize); ++m )
+      {
+	BinaryImageType::IndexType FtkBinIndex;
+	FtkBinIndex[0] = m-Start[0];
+	FtkBinIndex[1] = l-Start[1];
+	FtkBinIndex[2] = k;
+	InputImageType1::IndexType BinaryImIndex;
+	BinaryImIndex[0] = m;
+	BinaryImIndex[1] = l;
+	BinaryImIndex[2] = k;
+	BinOutConstIter.SetIndex( FtkBinIndex );
+	BinMontagIter.SetIndex( BinaryImIndex );
+	if( BinOutConstIter.Get() )
+	  BinMontagIter.Set( 255 );
+      }
+  delete newNucSeg;
+}
 
 //***********************************************************************************************************
 //  MULTI-MODEL SEGMENTATION

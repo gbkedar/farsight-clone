@@ -65,6 +65,9 @@ public:
 	typedef unsigned char IPixelT;
 	typedef unsigned short LPixelT;
 	typedef itk::Image<unsigned short, 3> LabelImageType;
+	typedef itk::Image<unsigned char,  3> InputImageType1;
+	typedef itk::Image<unsigned int,   3> LabelImageType1;
+	typedef itk::LabelStatisticsImageFilter< InputImageType1, LabelImageType1 >::BoundingBoxType BBoxType;
 
 	typedef struct { ftk::ProjectDefinition::TaskType type; int inputChannel1; int inputChannel2; int inputChannel3; bool done; } Task;
 	ProjectProcessor();
@@ -95,6 +98,14 @@ protected:
 	//Tasks I can do:
 	bool PreprocessImage( void );
 	bool SegmentNuclei(int nucChannel);						//Segment nucChannel as Nuclei & Compute Intrinsic Features
+	//Functions for segmenting nuclei in montages
+	void  SegmentNucleiMontage( int nucChannel );
+	void BinarizeTile( InputImageType1::Pointer InputImage, InputImageType1::Pointer BinaryImage,
+			   InputImageType1::IndexType Start, InputImageType1::SizeType Size );
+	std::vector< BBoxType > ReSegmentCCs( InputImageType1::Pointer InputImage, LabelImageType1::Pointer CCImage,
+						 std::vector< std::string >& SegOutFilenames,
+						 std::vector<LabelImageType1::PixelType>& labelsList );
+
 	void mmSegmentation(int intChannel, int labChannel);
 	bool ComputeFeatures(int nucChannel);
 	template <typename InputPixelType, typename LabelPixelType>
