@@ -1,3 +1,19 @@
+OPTION( BUILD_PROJPROC_WITH_MONT_SEG "Build Project Processor With Montage Segmentation" OFF )
+IF( BUILD_PROJPROC_WITH_MONT_SEG )
+  set(Boost_USE_STATIC_LIBS ON)
+  set(Boost_USE_MULTITHREADED ON)
+  set(Boost_USE_STATIC_RUNTIME OFF)
+  find_package(Boost COMPONENTS filesystem system)
+  add_definitions( -DPROJPROC_WITH_MONT_SEG )
+  message( "Using boost libraries: ${Boost_LIBRARIES}" )
+  IF( NOT Boost_LIBRARY_DIRS )
+    message( "Compiled Boost libs not found. Forcing BUILD_PROJPROC_WITH_MONTSEG Off" )
+    set( BUILD_PROJPROC_WITH_MONT_SEG OFF CACHE BOOL 
+	    	"Build Project Processor With Montage Segmentation" FORCE )
+  ENDIF()
+ENDIF( BUILD_PROJPROC_WITH_MONT_SEG )
+
+
 SET( NucleusEditor_SRCS
   NucleusEditor.cpp
   ProjectFilenamesDialog.cpp
@@ -162,13 +178,22 @@ ELSE (USE_TRACKING)
   LIST(APPEND NUCLEUSEDITOR_LIBRARIES ftkImage)
 ENDIF (USE_TRACKING)
 
+IF( BUILD_PROJPROC_WITH_MONT_SEG )
+  LIST(APPEND NUCLEUSEDITOR_LIBRARIES ${Boost_LIBRARIES} )
+ENDIF( BUILD_PROJPROC_WITH_MONT_SEG )
+
 add_farsight_executable(NucleusEditor "${NUCLEUSEDITOR_SOURCES}" "${NUCLEUSEDITOR_LIBRARIES}")
 
-ADD_LIBRARY( Project_Processor STATIC ftkProjectProcessor.cpp ftkProjectProcessor.h ftkProjectDefinition.cpp ftkProjectDefinition.h)
-TARGET_LINK_LIBRARIES( Project_Processor ${QT_LIBRARIES}  ftkGraphs ftkGUI ftkImage ftkCommon ftkFeatures NuclearSegmentation CytoplasmSegmentation PixelLevelAnalysis NESQLITE sqlite3 MCLR diffusion_map )
+ADD_LIBRARY( Project_Processor STATIC   ftkProjectProcessor.cpp ftkProjectProcessor.h ftkProjectDefinition.cpp
+					ftkProjectDefinition.h)
+TARGET_LINK_LIBRARIES( Project_Processor ${QT_LIBRARIES}  ftkGraphs ftkGUI ftkImage ftkCommon ftkFeatures
+					 NuclearSegmentation CytoplasmSegmentation PixelLevelAnalysis
+					 NESQLITE sqlite3 MCLR diffusion_map ${Boost_LIBRARIES} )
 
 ADD_EXECUTABLE( projproc processor_main.cpp ftkProjectProcessor.cpp ftkProjectDefinition.cpp)
-TARGET_LINK_LIBRARIES( projproc ${QT_LIBRARIES}  ftkGraphs ftkGUI ftkImage ftkCommon ftkFeatures NuclearSegmentation CytoplasmSegmentation PixelLevelAnalysis NESQLITE sqlite3 MCLR diffusion_map )
+TARGET_LINK_LIBRARIES( projproc ${QT_LIBRARIES}  ftkGraphs ftkGUI ftkImage ftkCommon ftkFeatures
+				NuclearSegmentation CytoplasmSegmentation PixelLevelAnalysis NESQLITE sqlite3
+				MCLR diffusion_map ${Boost_LIBRARIES})
 install(TARGETS projproc DESTINATION ${INSTALL_BIN_DIR} )
 
 IF (BUILD_MODEL_SEG)

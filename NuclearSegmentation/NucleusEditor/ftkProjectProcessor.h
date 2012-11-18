@@ -46,7 +46,6 @@
 #include "itkIntTypes.h"
 #include "itkRegionOfInterestImageFilter.h"
 #include "itkLabelStatisticsImageFilter.h"
-#include "itkImageDuplicator.h"
 #include "itkMultiThreader.h"
 
 // MODEL_SEG is defined as a compiler option in the Nucleus Editor's CMakeLists
@@ -54,6 +53,10 @@
 #include "Statistical_Model_Segmentation/model_nucleus_seg.h"
 #endif
 
+#ifdef PROJPROC_WITH_MONT_SEG
+#include "boost/filesystem/path.hpp"
+#include "boost/filesystem/operations.hpp"
+#endif //PROJPROC_WITH_MONT_SEG
 
 namespace ftk
 {
@@ -99,12 +102,17 @@ protected:
 	bool PreprocessImage( void );
 	bool SegmentNuclei(int nucChannel);						//Segment nucChannel as Nuclei & Compute Intrinsic Features
 	//Functions for segmenting nuclei in montages
-	void  SegmentNucleiMontage( int nucChannel );
+#ifdef PROJPROC_WITH_MONT_SEG
+	void SegmentNucleiMontage( int nucChannel );
 	void BinarizeTile( InputImageType1::Pointer InputImage, InputImageType1::Pointer BinaryImage,
-			   InputImageType1::IndexType Start, InputImageType1::SizeType Size );
-	std::vector< BBoxType > ReSegmentCCs( InputImageType1::Pointer InputImage, LabelImageType1::Pointer CCImage,
-						 std::vector< std::string >& SegOutFilenames,
-						 std::vector<LabelImageType1::PixelType>& labelsList );
+			   InputImageType1::IndexType Start, InputImageType1::SizeType Size, std::string Temp);
+	std::vector< BBoxType > ReSegmentCCs( InputImageType1::Pointer InputImage,
+						LabelImageType1::Pointer CCImage,
+						std::vector< std::string >& SegOutFilenames,
+						std::vector<LabelImageType1::PixelType>& labelsList,
+						std::string TempFolder );
+	std::string CheckWritePermissionsNCreateTempFolder();
+#endif //PROJPROC_WITH_MONT_SEG
 
 	void mmSegmentation(int intChannel, int labChannel);
 	bool ComputeFeatures(int nucChannel);
