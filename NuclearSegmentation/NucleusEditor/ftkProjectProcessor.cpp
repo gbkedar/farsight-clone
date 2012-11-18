@@ -348,8 +348,8 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
     TileSize = TileSize/2;
   }
   itk::SizeValueType NumHorizontalTiles, NumVerticalTiles;
-  NumHorizontalTiles = ceil(((double)numColumns)/((double)TileSize-MaxScale));
-  NumVerticalTiles   = ceil(((double)numRows)/((double)TileSize-MaxScale));
+  NumHorizontalTiles = ceil(((double)numColumns-MaxScale)/((double)TileSize-MaxScale));
+  NumVerticalTiles   = ceil(((double)numRows-MaxScale)/((double)TileSize-MaxScale));
   ConnectedComponentFilterType::Pointer ComponentFilter = ConnectedComponentFilterType::New();
   //Step 1: Binarize the images
 { //Scoping for binary image
@@ -395,8 +395,10 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
 		 <<(NumVerticalTiles*NumHorizontalTiles)<<"\n";
 	InputImageType1::IndexType Start;
 	//Ensure that the last tile is big enough
-	Start[0] = (j*TileSize-j*MaxScale) < (numColumns-TileSize) ? (j*TileSize) : (numColumns-TileSize-1);
-	Start[1] = (i*TileSize-i*MaxScale) < (numRows   -TileSize) ? (i*TileSize) : (numRows   -TileSize-1);
+	Start[0] = (j*(TileSize-MaxScale)) < (numColumns-TileSize) ?
+		   (j*(TileSize-MaxScale)) : (numColumns-TileSize-1);
+	Start[1] = (i*(TileSize-MaxScale)) < (numRows   -TileSize) ?
+		   (i*(TileSize-MaxScale)) : (numRows   -TileSize-1);
 	Start[2] = 0;
 	InputImageType1::SizeType Size;
 	Size[0] = TileSize;
@@ -531,7 +533,7 @@ void ProjectProcessor::BinarizeTile( InputImageType1::Pointer InputImage,
     try{ CropImageFilter->Update(); }
     catch( itk::ExceptionObject & excp )
     {
-      std::cerr <<  "Extracction for binarization failed" << excp << std::endl;
+      std::cerr <<  "Extraction for binarization failed" << excp << std::endl;
     }
     BinMontageIteratorType PixBuf(  CropImageFilter->GetOutput(),
     				CropImageFilter->GetOutput()->GetLargestPossibleRegion() );
