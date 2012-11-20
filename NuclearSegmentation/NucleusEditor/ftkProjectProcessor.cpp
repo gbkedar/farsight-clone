@@ -660,6 +660,7 @@ std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer Inpu
     InputImageType1::RegionType CroppedRegion;
     CroppedRegion.SetSize ( Size );
     CroppedRegion.SetIndex( Start );
+    std::cout<<"Cropping region "<<CroppedRegion<<std::endl<<std::flush;
     ROIFilterType::Pointer CropImageFilter = ROIFilterType::New();
     CropImageFilter->SetInput( InputImage );
     CropImageFilter->SetRegionOfInterest( CroppedRegion );

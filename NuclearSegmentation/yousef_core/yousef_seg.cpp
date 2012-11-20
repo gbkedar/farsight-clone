@@ -895,7 +895,8 @@ void yousef_nucleus_seg::runAlphaExpansion(){
 
 void yousef_nucleus_seg::runAlphaExpansion2D(){
 	//First check for necessary prerequisites
-	if( !dataImagePtr || !logImagePtr || !seedImagePtr || !binImagePtr || !myConnComp ){
+	if( !dataImagePtr || !logImagePtr || !seedImagePtr || !binImagePtr || !myConnComp )
+	{
 		return;
 	}
 
@@ -909,7 +910,8 @@ void yousef_nucleus_seg::runAlphaExpansion2D(){
 
 	segImagePtr = new unsigned short[numRows*numColumns];
 	memset(segImagePtr/*destination*/,0/*value*/,numStacks*numRows*numColumns*sizeof(unsigned short)/*num bytes to move*/);
-
+	if( !mySeeds.size() )
+		return;
 	for( int n=0; n<numConnComp; n++ )
 	{
 		std::cout<<"Processing Connected Component #"<<n+1<<"...";
