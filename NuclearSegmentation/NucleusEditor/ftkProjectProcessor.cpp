@@ -767,6 +767,8 @@ std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer Inpu
   {
     std::cerr <<  "Write for intermediate labels failed" << excp << std::endl;
   }
+  free(DataPtr);
+  delete newNucSeg;
   return OutFile;
 }
 
