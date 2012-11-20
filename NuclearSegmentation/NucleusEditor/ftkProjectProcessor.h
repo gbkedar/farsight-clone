@@ -110,7 +110,10 @@ protected:
 						LabelImageType1::Pointer CCImage,
 						std::vector< std::string >& SegOutFilenames,
 						std::vector<LabelImageType1::PixelType>& labelsList,
-						std::string TempFolder );
+						std::string TempFolder, unsigned MaxScale );
+	std::string SegmentNucleiInBBox( InputImageType1::Pointer InputImage, LabelImageType1::Pointer CCImage,
+					 BBoxType BBox, unsigned MaxScale,
+					 LabelImageType1::PixelType CurrentBBLabel, std::string TempFolder );
 	std::string CheckWritePermissionsNCreateTempFolder();
 #endif //PROJPROC_WITH_MONT_SEG
 

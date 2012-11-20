@@ -330,6 +330,7 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
   itk::SizeValueType TileSize = 1600;	//Default tile size for 2D
   unsigned MaxScale = 50; //Default padding around connected components for resegmentation
 			  //Also the default overlap between tiles when binarizing
+			  //Should read this from the project definition
   const Image::Info *info = inputImage->GetImageInfo();
   itk::SizeValueType numStacks = info->numZSlices;  //z-direction
   itk::SizeValueType numRows = info->numRows;	    //y-direction
@@ -348,8 +349,8 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
     TileSize = TileSize/2;
   }
   itk::SizeValueType NumHorizontalTiles, NumVerticalTiles;
-  NumHorizontalTiles = ceil(((double)numColumns-MaxScale)/((double)TileSize-MaxScale));
-  NumVerticalTiles   = ceil(((double)numRows-MaxScale)/((double)TileSize-MaxScale));
+  NumHorizontalTiles = ceil(((double)numColumns-TileSize)/((double)TileSize-MaxScale))+1;
+  NumVerticalTiles   = ceil(((double)numRows-TileSize)/((double)TileSize-MaxScale))+1;
   ConnectedComponentFilterType::Pointer ComponentFilter = ConnectedComponentFilterType::New();
   //Step 1: Binarize the images
 { //Scoping for binary image
@@ -380,7 +381,7 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
   std::cout<<"Using "<<n_thr<<" threads\n"<<std::flush;
 #if _OPENMP > 200805L
   omp_set_max_active_levels(1);
-  #pragma omp parallel for num_threads(n_thr) collapse(2)
+  #pragma omp parallel for num_threads(n_thr) collapse(2) schedule(dynamic,1)
   for( itk::SizeValueType i=0; i<NumVerticalTiles; ++i )
 #else
   #pragma omp parallel for num_threads(n_thr)
@@ -406,7 +407,7 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
 	Size[2] = numStacks;
 	BinarizeTile( InputImage, BinaryImage, Start, Size, TempFolder );
     }
-#if 0
+#if 1
   typedef itk::ImageFileWriter< InputImageType1 > BinaryWriterType;
   BinaryWriterType::Pointer binwriter = BinaryWriterType::New();
   binwriter->SetInput( BinaryImage );
@@ -432,7 +433,7 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
   std::vector< std::string > SegOutFilenames;
   std::vector< BBoxType > ILabelsBBoxes;
   std::vector<LabelImageType1::PixelType> labelsList;
-  ILabelsBBoxes = ReSegmentCCs( InputImage, CCImage, SegOutFilenames, labelsList, TempFolder );
+  ILabelsBBoxes = ReSegmentCCs( InputImage, CCImage, SegOutFilenames, labelsList, TempFolder, MaxScale );
 }
 
 std::string ProjectProcessor::CheckWritePermissionsNCreateTempFolder()
@@ -465,48 +466,6 @@ std::string ProjectProcessor::CheckWritePermissionsNCreateTempFolder()
   }
   return temp_dir_str;
 }
-
-std::vector< ftk::ProjectProcessor::BBoxType > ProjectProcessor::ReSegmentCCs
-		( InputImageType1::Pointer InputImage, LabelImageType1::Pointer CCImage,
-		  std::vector< std::string >& SegOutFilenames,
-		  std::vector<LabelImageType1::PixelType>& labelsList, std::string TempFolder ) 
-{
-  typedef itk::LabelStatisticsImageFilter< InputImageType1, LabelImageType1 > LabelStatisticsImageFilterType;
-  typedef LabelStatisticsImageFilterType::ValidLabelValuesContainerType ValidLabelValuesType;
-  std::vector< BBoxType > OutputBBoxes;
-#ifdef _OPENMP
-  itk::MultiThreader::SetGlobalDefaultNumberOfThreads(n_thr);
-#endif
-  LabelStatisticsImageFilterType::Pointer LabelStatisticsImageFilter = LabelStatisticsImageFilterType::New();
-  LabelStatisticsImageFilter->SetLabelInput( CCImage );
-  LabelStatisticsImageFilter->SetInput( InputImage );
-  LabelStatisticsImageFilter->UseHistogramsOff();
-  std::cout<<"Getting bounding boxes for initial CCs\n"<<std::flush;
-  try{ LabelStatisticsImageFilter->Update(); }
-  catch( itk::ExceptionObject & excp ){ std::cerr << excp << std::endl; }
-#ifdef _OPENMP
-  itk::MultiThreader::SetGlobalDefaultNumberOfThreads(1);
-#endif
-  for( ValidLabelValuesType::const_iterator vIt=LabelStatisticsImageFilter->GetValidLabelValues().begin();
-       vIt != LabelStatisticsImageFilter->GetValidLabelValues().end();	++vIt )
-    if ( LabelStatisticsImageFilter->HasLabel(*vIt) )
-      if( *vIt ) //Skips 0 if present
-      {
-	 labelsList.push_back(*vIt);
-	 OutputBBoxes.push_back( LabelStatisticsImageFilter->GetBoundingBox(*vIt) );
-      }
-  std::cout<<"Found bounding boxes for initial CCs "<<labelsList.size()<<std::endl<<std::flush;
-
-  //Write images corresponding to CCs in the temp folder
-
-  //Segment images and write outputs
-
-  //Delete intensity image crops with boost
-
-
-  return OutputBBoxes;
-}
-
 void ProjectProcessor::BinarizeTile( InputImageType1::Pointer InputImage,
   InputImageType1::Pointer BinaryImage, InputImageType1::IndexType Start, InputImageType1::SizeType Size,
   std::string TempFolder )
@@ -535,6 +494,17 @@ void ProjectProcessor::BinarizeTile( InputImageType1::Pointer InputImage,
     {
       std::cerr <<  "Extraction for binarization failed" << excp << std::endl;
     }
+#if 0
+  typedef itk::ImageFileWriter< InputImageType1 > BinaryWriterType1;
+  BinaryWriterType1::Pointer binwriter1 = BinaryWriterType1::New();
+  binwriter1->SetInput( CropImageFilter->GetOutput() );
+  std::stringstream filess1;
+  filess1 << Start[0] << "_" <<Start[1] << "_" << Start[2];
+  std::string OutFile1 = TempFolder + "/Temp_" + filess1.str() + "_crop.tif" ;
+  binwriter1->SetFileName( OutFile1.c_str() );
+  try{ binwriter1->Update(); }
+  catch( itk::ExceptionObject & excp ){ std::cerr << excp << std::endl; }
+#endif
     BinMontageIteratorType PixBuf(  CropImageFilter->GetOutput(),
     				CropImageFilter->GetOutput()->GetLargestPossibleRegion() );
     itk::SizeValueType Index = 0;
@@ -591,8 +561,214 @@ void ProjectProcessor::BinarizeTile( InputImageType1::Pointer InputImage,
 	if( BinOutConstIter.Get() )
 	  BinMontagIter.Set( 255 );
       }
+#if 0
+  typedef itk::ImageFileWriter< BinaryImageType > BinaryWriterType;
+  BinaryWriterType::Pointer binwriter = BinaryWriterType::New();
+  binwriter->SetInput( BinIm );
+  std::stringstream filess;
+  filess << Start[0] << "_" <<Start[1] << "_" << Start[2];
+  std::string OutFile = TempFolder + "/Temp_" + filess.str() + "_Bin.tif" ;
+  binwriter->SetFileName( OutFile.c_str() );
+  try{ binwriter->Update(); }
+  catch( itk::ExceptionObject & excp ){ std::cerr << excp << std::endl; }
+#endif
   delete newNucSeg;
 }
+
+std::vector< ftk::ProjectProcessor::BBoxType > ProjectProcessor::ReSegmentCCs
+		( InputImageType1::Pointer InputImage, LabelImageType1::Pointer CCImage,
+		  std::vector< std::string >& SegOutFilenames,
+		  std::vector<LabelImageType1::PixelType>& labelsList, std::string TempFolder,
+		  unsigned MaxScale ) 
+{
+  typedef itk::LabelStatisticsImageFilter< InputImageType1, LabelImageType1 > LabelStatisticsImageFilterType;
+  typedef LabelStatisticsImageFilterType::ValidLabelValuesContainerType ValidLabelValuesType;
+  std::vector< BBoxType > OutputBBoxes;
+#ifdef _OPENMP
+  itk::MultiThreader::SetGlobalDefaultNumberOfThreads(n_thr);
+#endif
+  LabelStatisticsImageFilterType::Pointer LabelStatisticsImageFilter = LabelStatisticsImageFilterType::New();
+  LabelStatisticsImageFilter->SetLabelInput( CCImage );
+  LabelStatisticsImageFilter->SetInput( InputImage );
+  LabelStatisticsImageFilter->UseHistogramsOff();
+  std::cout<<"Getting bounding boxes for initial CCs\n"<<std::flush;
+  try{ LabelStatisticsImageFilter->Update(); }
+  catch( itk::ExceptionObject & excp ){ std::cerr << excp << std::endl; }
+#ifdef _OPENMP
+  itk::MultiThreader::SetGlobalDefaultNumberOfThreads(1);
+#endif
+  for( ValidLabelValuesType::const_iterator vIt=LabelStatisticsImageFilter->GetValidLabelValues().begin();
+       vIt != LabelStatisticsImageFilter->GetValidLabelValues().end();	++vIt )
+    if ( LabelStatisticsImageFilter->HasLabel(*vIt) )
+      if( *vIt ) //Skips 0 if present
+      {
+	 labelsList.push_back(*vIt);
+	 OutputBBoxes.push_back( LabelStatisticsImageFilter->GetBoundingBox(*vIt) );
+      }
+  std::cout<<"Found bounding boxes for initial CCs "<<labelsList.size()<<std::endl<<std::flush;
+  SegOutFilenames.resize( labelsList.size() );
+
+  //Segment images and write outputs
+#ifdef _OPENMP
+#if _OPENMP > 200805L
+  #pragma omp parallel for num_threads(n_thr) schedule(dynamic,1)
+  for( LabelImageType1::PixelType i=0; i<labelsList.size(); ++i )
+#else
+  #pragma omp parallel for num_threads(n_thr)
+  for( itk::IndexValueType i=0; i<labelsList.size(); ++i )
+#endif
+#else
+  for( LabelImageType1::PixelType i=0; i<labelsList.size(); ++i )
+#endif
+  {
+    SegOutFilenames.at(i) = SegmentNucleiInBBox( InputImage, CCImage, OutputBBoxes.at(i), MaxScale,
+    						 labelsList.at(i), TempFolder);
+  }
+  
+  return OutputBBoxes;
+}
+
+std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer InputImage,
+			LabelImageType1::Pointer CCImage, BBoxType BBox, unsigned MaxScale,
+			LabelImageType1::PixelType CurrentBBLabel, std::string TempFolder )
+{
+//Start copy pasta  ***From BinarizeTile***
+  typedef itk::Image< unsigned short,  3 >  IntermediateLabelType;
+  typedef itk::RegionOfInterestImageFilter< InputImageType1, InputImageType1 > ROIFilterType;
+  typedef itk::ImageRegionIteratorWithIndex< InputImageType1 > BinMontageIteratorType;
+  typedef itk::ImageRegionIteratorWithIndex< IntermediateLabelType > LabelIteratorType;
+  typedef itk::ImageRegionConstIterator< LabelImageType1 > CCsConstIteratorType;
+  typedef itk::LabelGeometryImageFilter< IntermediateLabelType > LabelGeometryImageFilterType;
+  typedef itk::ImageFileWriter< IntermediateLabelType > WriterType;
+
+  InputImageType1::SizeType ImageSize;
+  ImageSize[0] = InputImage->GetLargestPossibleRegion().GetSize()[0];
+  ImageSize[1] = InputImage->GetLargestPossibleRegion().GetSize()[1];
+  ImageSize[2] = InputImage->GetLargestPossibleRegion().GetSize()[2];
+  InputImageType1::IndexType Start;
+  Start[0] = (BBox[0]-MaxScale) > 0 ? (BBox[0]-MaxScale) : 0;
+  Start[1] = (BBox[2]-MaxScale) > 0 ? (BBox[2]-MaxScale) : 0;
+  Start[2] = (BBox[4]-MaxScale) > 0 ? (BBox[4]-MaxScale) : 0;
+  InputImageType1::SizeType Size;
+  Size[0] = (BBox[1]+MaxScale) < ImageSize[0] ? (BBox[1]+2*MaxScale-BBox[0]) : (ImageSize[0]-Start[0]);
+  Size[1] = (BBox[3]+MaxScale) < ImageSize[1] ? (BBox[3]+2*MaxScale-BBox[2]) : (ImageSize[1]-Start[1]);
+  Size[2] = (BBox[5]+MaxScale) < ImageSize[2] ? (BBox[5]+2*MaxScale-BBox[4]) : (ImageSize[2]-Start[2]);
+  //Crop Input Image
+  unsigned char *DataPtr;
+  DataPtr = (unsigned char*)malloc( sizeof(unsigned char)*Size[0]*Size[1]*Size[2] );
+{ //Scoping for temp cropimage
+    InputImageType1::RegionType CroppedRegion;
+    CroppedRegion.SetSize ( Size );
+    CroppedRegion.SetIndex( Start );
+    ROIFilterType::Pointer CropImageFilter = ROIFilterType::New();
+    CropImageFilter->SetInput( InputImage );
+    CropImageFilter->SetRegionOfInterest( CroppedRegion );
+    try{ CropImageFilter->Update(); }
+    catch( itk::ExceptionObject & excp )
+    {
+      std::cerr <<  "Extraction for segmentation failed" << excp << std::endl << std::flush;
+    }
+    BinMontageIteratorType PixBuf(  CropImageFilter->GetOutput(),
+    				CropImageFilter->GetOutput()->GetLargestPossibleRegion() );
+    itk::SizeValueType Index = 0;
+    for( PixBuf.GoToBegin(); !PixBuf.IsAtEnd(); ++PixBuf )
+    {
+      DataPtr[Index] = PixBuf.Get();
+      ++Index;
+    }
+} //End scoping for temp cropimage
+
+  //Create binarization object
+  ftk::NuclearSegmentation * newNucSeg = new ftk::NuclearSegmentation();
+
+  //Read Parameters
+  for(int i=0; i<(int)definition->nuclearParameters.size(); ++i)
+    newNucSeg->SetParameter(	definition->nuclearParameters.at(i).name,
+				int(definition->nuclearParameters.at(i).value) );
+
+  //Convert input image to FTKImage
+  ftk::Image::Pointer FTKIImage = ftk::Image::New();
+  std::vector<unsigned char> color;
+  color.assign(3,255);
+  FTKIImage->AppendChannelFromData3D( (void*)DataPtr,
+					itk::ImageIOBase::UCHAR, sizeof(unsigned char),
+					Size[0], Size[1], Size[2], "nuc", color, false );
+  newNucSeg->SetInput( FTKIImage, "nuc", 0 );
+
+  //Run Binarization
+  newNucSeg->Binarize(false);
+//End copy pasta ***From BinarizeTile***
+  newNucSeg->DetectSeeds(false);
+  newNucSeg->RunClustering(false);
+  newNucSeg->Finalize();
+
+  //Get Output
+  ftk::Image::Pointer FTKOImage = newNucSeg->GetLabelImage();
+  IntermediateLabelType::Pointer LabIm = FTKOImage->
+				GetItkPtr< IntermediateLabelType::PixelType >( 0, 0, ftk::Image::DEFAULT );
+
+  //Get CCs of the segmented cells
+  LabelGeometryImageFilterType::Pointer LabelGeometryFilter = LabelGeometryImageFilterType::New();
+  LabelGeometryFilter->CalculatePixelIndicesOn();
+  LabelGeometryFilter->CalculateOrientedBoundingBoxOff();
+  LabelGeometryFilter->CalculateOrientedLabelRegionsOff();
+  LabelGeometryFilter->SetInput( LabIm );
+
+  try{ LabelGeometryFilter->Update(); }
+  catch( itk::ExceptionObject & excp )
+  {
+    std::cerr <<  "Geometry Extraction for label failed" << excp << std::endl;
+  }
+
+  LabelGeometryImageFilterType::LabelsType allLabels = LabelGeometryFilter->GetLabels();
+  LabelGeometryImageFilterType::LabelsType::iterator allLabelsIt;
+  CCsConstIteratorType CCsIter ( CCImage, CCImage->GetLargestPossibleRegion() );
+  for( allLabelsIt = allLabels.begin(); allLabelsIt != allLabels.end(); allLabelsIt++ )
+  {
+    LabelGeometryImageFilterType::LabelPixelType labelValue = *allLabelsIt;
+    LabelGeometryFilter->GetCentroid(labelValue);
+    IntermediateLabelType::IndexType CurrentCentroid;
+    CurrentCentroid[0] = LabelGeometryFilter->GetCentroid(labelValue)[0];
+    CurrentCentroid[1] = LabelGeometryFilter->GetCentroid(labelValue)[1];
+    CurrentCentroid[2] = LabelGeometryFilter->GetCentroid(labelValue)[2];
+    //Translate current centroid to the global coordinates
+    CurrentCentroid[0] += Start[0];
+    CurrentCentroid[1] += Start[1];
+    CurrentCentroid[2] += Start[2];
+    CCsIter.SetIndex( CurrentCentroid );
+    if( CCsIter.Get()!=CurrentBBLabel )
+    {
+      //Delete the label
+      std::vector< IntermediateLabelType::IndexType > LabelPixels =
+      							LabelGeometryFilter->GetPixelIndices(labelValue);
+      LabelIteratorType DeleteIter( LabIm, LabIm->GetLargestPossibleRegion() );
+      std::vector< IntermediateLabelType::IndexType >::iterator it;
+      for( it=LabelPixels.begin(); it!=LabelPixels.end(); ++it )
+      {
+        DeleteIter.SetIndex( *it );
+	DeleteIter.Set(0);
+      }
+    }
+  }
+
+  //Generate intermediate file string
+  std::string OutFile;
+  std::stringstream filess;
+  filess << Start[0] << "_" <<Start[1] << "_" << Start[2];
+  OutFile = TempFolder + "/Temp_" + filess.str() + ".tif" ;
+
+  //Write intermediate file
+  WriterType::Pointer writer = WriterType::New();
+  writer->SetInput( LabIm );
+  writer->SetFileName( OutFile.c_str() );
+  try{ writer->Update(); }
+  catch( itk::ExceptionObject & excp )
+  {
+    std::cerr <<  "Write for intermediate labels failed" << excp << std::endl;
+  }
+  return OutFile;
+}
+
 #endif //PROJPROC_WITH_MONT_SEG
 
 //***********************************************************************************************************
