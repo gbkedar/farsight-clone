@@ -351,7 +351,13 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
   itk::SizeValueType NumHorizontalTiles, NumVerticalTiles;
   NumHorizontalTiles = ceil(((double)numColumns-TileSize)/((double)TileSize-MaxScale))+1;
   NumVerticalTiles   = ceil(((double)numRows-TileSize)/((double)TileSize-MaxScale))+1;
-  ConnectedComponentFilterType::Pointer ComponentFilter = ConnectedComponentFilterType::New();
+
+  std::vector< std::string > SegOutFilenames;
+  std::vector< BBoxType > ILabelsBBoxes;
+  std::vector<LabelImageType1::PixelType> labelsList;
+  itk::SizeValueType NumberOfCells = 0;
+{ //Scoping for CCImage
+  LabelImageType1::Pointer CCImage;
   //Step 1: Binarize the images
 { //Scoping for binary image
   //Start by allocating memory for the binary image
@@ -379,7 +385,7 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
   if(!numThreadsSet) n_thr = 0.95*omp_get_max_threads();
   itk::MultiThreader::SetGlobalDefaultNumberOfThreads(1);
   std::cout<<"Using "<<n_thr<<" threads\n"<<std::flush;
-#if _OPENMP > 200805L
+#if _OPENMP >= 200805L
   omp_set_max_active_levels(1);
   #pragma omp parallel for num_threads(n_thr) collapse(2) schedule(dynamic,1)
   for( itk::SizeValueType i=0; i<NumVerticalTiles; ++i )
@@ -421,19 +427,30 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
   itk::MultiThreader::SetGlobalDefaultNumberOfThreads(n_thr);
 #endif
   std::cout<<"Computing Initial Lables\n"<<std::flush;
+  ConnectedComponentFilterType::Pointer ComponentFilter = ConnectedComponentFilterType::New();
   ComponentFilter->SetInput( BinaryImage );
   ComponentFilter->SetFullyConnected( true );
   try{ ComponentFilter->Update(); }
   catch( itk::ExceptionObject & excp ){ std::cerr << excp << std::endl; }
+  CCImage = ComponentFilter->GetOutput();
 } //End scoping for binary image
 #ifdef _OPENMP
   itk::MultiThreader::SetGlobalDefaultNumberOfThreads(1);
 #endif
-  LabelImageType1::Pointer CCImage = ComponentFilter->GetOutput();
-  std::vector< std::string > SegOutFilenames;
-  std::vector< BBoxType > ILabelsBBoxes;
-  std::vector<LabelImageType1::PixelType> labelsList;
-  ILabelsBBoxes = ReSegmentCCs( InputImage, CCImage, SegOutFilenames, labelsList, TempFolder, MaxScale );
+  ILabelsBBoxes = ReSegmentCCs( InputImage, CCImage, SegOutFilenames, labelsList, TempFolder, MaxScale,
+  				NumberOfCells );
+} //End scoping for CCImage
+  if( NumberOfCells < itk::NumericTraits<LabelImageType::PixelType>::max() )
+    StitchLabels<LabelImageType::PixelType>( SegOutFilenames );
+  else if( NumberOfCells < itk::NumericTraits<LabelImageType1::PixelType>::max() )
+    StitchLabels<LabelImageType1::PixelType>( SegOutFilenames );
+  else
+  {
+    std::cout	<<"More than "<<itk::NumericTraits<LabelImageType1::PixelType>::max()
+    		<<" labels foud. Exiting as only 32 bit labels can be written\n";
+    exit( EXIT_FAILURE );
+  }
+  return;
 }
 
 std::string ProjectProcessor::CheckWritePermissionsNCreateTempFolder()
@@ -579,7 +596,7 @@ std::vector< ftk::ProjectProcessor::BBoxType > ProjectProcessor::ReSegmentCCs
 		( InputImageType1::Pointer InputImage, LabelImageType1::Pointer CCImage,
 		  std::vector< std::string >& SegOutFilenames,
 		  std::vector<LabelImageType1::PixelType>& labelsList, std::string TempFolder,
-		  unsigned MaxScale ) 
+		  unsigned MaxScale, itk::SizeValueType& NumberOfCells ) 
 {
   typedef itk::LabelStatisticsImageFilter< InputImageType1, LabelImageType1 > LabelStatisticsImageFilterType;
   typedef LabelStatisticsImageFilterType::ValidLabelValuesContainerType ValidLabelValuesType;
@@ -610,7 +627,7 @@ std::vector< ftk::ProjectProcessor::BBoxType > ProjectProcessor::ReSegmentCCs
 
   //Segment images and write outputs
 #ifdef _OPENMP
-#if _OPENMP > 200805L
+#if _OPENMP >= 200805L
   #pragma omp parallel for num_threads(n_thr) schedule(dynamic,1)
   for( LabelImageType1::PixelType i=0; i<labelsList.size(); ++i )
 #else
@@ -621,8 +638,12 @@ std::vector< ftk::ProjectProcessor::BBoxType > ProjectProcessor::ReSegmentCCs
   for( LabelImageType1::PixelType i=0; i<labelsList.size(); ++i )
 #endif
   {
+    LabelImageType1::PixelType NumCells;
     SegOutFilenames.at(i) = SegmentNucleiInBBox( InputImage, CCImage, OutputBBoxes.at(i), MaxScale,
-    						 labelsList.at(i), TempFolder);
+    						 labelsList.at(i), TempFolder, NumCells );
+#pragma omp critical
+    NumberOfCells += NumCells;
+
   }
   
   return OutputBBoxes;
@@ -630,7 +651,8 @@ std::vector< ftk::ProjectProcessor::BBoxType > ProjectProcessor::ReSegmentCCs
 
 std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer InputImage,
 			LabelImageType1::Pointer CCImage, BBoxType BBox, unsigned MaxScale,
-			LabelImageType1::PixelType CurrentBBLabel, std::string TempFolder )
+			LabelImageType1::PixelType CurrentBBLabel, std::string TempFolder,
+			LabelImageType1::PixelType& NumCells)
 {
 //Start copy pasta  ***From BinarizeTile***
   typedef itk::Image< unsigned short,  3 >  IntermediateLabelType;
@@ -771,6 +793,8 @@ std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer Inpu
   delete newNucSeg;
   return OutFile;
 }
+
+
 
 #endif //PROJPROC_WITH_MONT_SEG
 

@@ -212,7 +212,7 @@ std::vector<float> compute_ec_features( USImageType::Pointer input_image,  USIma
 itk::MultiThreader::SetGlobalDefaultNumberOfThreads(1);
 #pragma omp parallel for
 #if _OPENMP < 200805L
-		for( int i=0; i<labelsList.size(); ++i )
+		for( itk::IndexValueType i=0; i<labelsList.size(); ++i )
 #else
 		for( USImageType::PixelType i=0; i<labelsList.size(); ++i )
 #endif

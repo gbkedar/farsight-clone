@@ -134,7 +134,7 @@ template <typename InputPixelType, typename LabelPixelType>  void
 	if(!numThreadsSet) n_thr = 0.95*omp_get_max_threads();
 	itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
 	std::cout<<"Using "<<n_thr<<" threads\n"<<std::flush;
-#if _OPENMP > 200805L
+#if _OPENMP >= 200805L
 	omp_set_max_active_levels(1);
 	#pragma omp parallel for num_threads(n_thr)
 	for( LabelPixelType i=0; i<labelsList.size(); ++i )
@@ -269,4 +269,130 @@ template <typename InputPixelType, typename LabelPixelType>  void
 
 	return;
 }
+
+#ifdef PROJPROC_WITH_MONT_SEG
+
+template <typename LabelPixelType>  void
+	ProjectProcessor::StitchLabels( std::vector< std::string >& TempSegFiles )
+{
+  typedef typename itk::Image< LabelPixelType, 3 > OutputLabelsType;
+  typedef itk::ImageFileReader< LabelImageType > ReaderType;
+  typedef itk::LabelGeometryImageFilter< LabelImageType > LabelGeometryImageFilterType;
+  typedef typename itk::ImageRegionIteratorWithIndex< OutputLabelsType > MontageIteratorType;
+
+  typename OutputLabelsType::Pointer OutputLabelImage = OutputLabelsType::New();
+  typename OutputLabelsType::IndexType Start;
+  typename OutputLabelsType::SizeType Size;
+  Start[0] = Start[1] = Start[2] = 0;
+  Size[0] = inputImage->GetImageInfo()->numColumns;
+  Size[1] = inputImage->GetImageInfo()->numRows;
+  Size[2] = inputImage->GetImageInfo()->numZSlices;
+  typename OutputLabelsType::RegionType Region;
+  Region.SetSize ( Size );
+  Region.SetIndex( Start );
+  OutputLabelImage->SetRegions( Region );
+  OutputLabelImage->Allocate();
+  OutputLabelImage->FillBuffer(0);
+  OutputLabelImage->Update();
+
+  itk::SizeValueType NumFilesToStitch = TempSegFiles.size();
+  LabelPixelType NumLabelsUsed = 0;
+#ifdef _OPENMP
+#if _OPENMP >= 200805L
+  for( typename OutputLabelsType::PixelType i=0; i<NumFilesToStitch; ++i )
+#else
+  for( itk::IndexValueType i=0; i<NumFilesToStitch; ++i )
+#endif
+#else
+  for( LabelPixelType i=0; i<NumFilesToStitch; ++i )
+#endif
+  {
+    std::string CurrentFilename = ftk::GetFilenameFromFullPath( TempSegFiles.at(i) );
+    //Get the offset from the filename
+    size_t found = CurrentFilename.find_first_of( "_" );
+    std::string ext = CurrentFilename.substr( found+1 );
+    found = CurrentFilename.find_first_of( "_" );
+    std::string num1 = ext.substr( found-1 );
+    ext = ext.substr( found+1 );
+    found = CurrentFilename.find_first_of( "_" );
+    std::string num2 = ext.substr( found-1 );
+    ext = ext.substr( found+1 );
+    found = CurrentFilename.find_first_of( "_" );
+    std::string num3 = ext.substr( found-1 );
+    typename OutputLabelsType::IndexType OffSet;
+    OffSet[0] = std::atoll( num1.c_str() );
+    OffSet[1] = std::atoll( num2.c_str() );
+    OffSet[2] = std::atoll( num3.c_str() );
+
+    //Read sub-image and compute indices of labels
+    ReaderType::Pointer reader = ReaderType::New();
+    reader->SetFileName( TempSegFiles.at(i) );
+    LabelGeometryImageFilterType::Pointer LabelGeometryFilter = LabelGeometryImageFilterType::New();
+    LabelGeometryFilter->CalculatePixelIndicesOn();
+    LabelGeometryFilter->CalculateOrientedBoundingBoxOff();
+    LabelGeometryFilter->CalculateOrientedLabelRegionsOff();
+    LabelGeometryFilter->SetInput( reader->GetOutput() );
+    try{ LabelGeometryFilter->Update(); }
+    catch( itk::ExceptionObject & excp )
+    {
+      std::cerr << excp << std::endl;
+    }
+    LabelGeometryImageFilterType::LabelsType allLabels = LabelGeometryFilter->GetLabels();
+    LabelGeometryImageFilterType::LabelsType::iterator allLabelsIt;
+    MontageIteratorType MontageIter( OutputLabelImage, OutputLabelImage->GetRequestedRegion() );
+
+    //Iterate through sub-image labels and fill in montage labels
+    for( allLabelsIt = allLabels.begin(); allLabelsIt != allLabels.end(); allLabelsIt++ )
+    {
+      LabelGeometryImageFilterType::LabelPixelType labelValue = *allLabelsIt;
+      std::vector< LabelImageType::IndexType > LabelPixels = LabelGeometryFilter->GetPixelIndices(labelValue);
+      LabelPixelType CurrentMontageLabel;
+#pragma omp critical
+	CurrentMontageLabel = NumLabelsUsed++;
+      std::vector< LabelImageType::IndexType >::iterator it;
+      for( it=LabelPixels.begin(); it!=LabelPixels.end(); ++it )
+      {
+	typename OutputLabelsType::IndexType MontageIndex;
+	MontageIndex[0] = (*it)[0]+OffSet[0];
+	MontageIndex[1] = (*it)[1]+OffSet[1];
+	MontageIndex[2] = (*it)[2]+OffSet[2];
+	MontageIter.SetIndex( MontageIndex );
+	MontageIter.Set( CurrentMontageLabel );
+      }
+    }
+    //Delete temporary file
+    boost::filesystem::path RemoveFile = TempSegFiles.at(i).c_str();
+    try{ boost::filesystem::remove( RemoveFile ); }
+    catch( const boost::filesystem::filesystem_error& ex )
+    {
+      std::cout << "Error in removing file. " << ex.what() << '\n';
+    }
+  }
+  //All files are done delete folder
+  std::string TempFolder = ftk::GetFilePath( TempSegFiles.at(0) );
+  boost::filesystem::path RemoveFolder = TempFolder.c_str();
+  try{ boost::filesystem::remove( RemoveFolder ); }
+  catch( const boost::filesystem::filesystem_error& ex )
+  {
+    std::cout << "Error in removing file. " << ex.what() << '\n';
+  }
+
+  //Store the output label image in an ftkImage for further processing
+  if( outputImage )
+    delete outputImage;
+  outputImage = ftk::Image::New();
+  std::vector<unsigned char> color;
+  color.assign(3,255);
+  OutputLabelImage->Register(); //Avoid copying into ftkImage, mem dealloc when ftkimage destroyed
+  if( sizeof(LabelPixelType)==2 )
+    outputImage->AppendChannelFromData3D( (void*)OutputLabelImage->GetBufferPointer(),
+    					  itk::ImageIOBase::USHORT, sizeof(unsigned short),
+    					  Size[0], Size[1], Size[2], "nuc", color, false );
+  else
+    outputImage->AppendChannelFromData3D( (void*)OutputLabelImage->GetBufferPointer(),
+    					  itk::ImageIOBase::UINT, sizeof(unsigned int),
+					  Size[0], Size[1], Size[2], "nuc", color, false );
+}
+
+#endif //PROJPROC_WITH_MONT_SEG
 }

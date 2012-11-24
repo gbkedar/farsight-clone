@@ -110,11 +110,15 @@ protected:
 						LabelImageType1::Pointer CCImage,
 						std::vector< std::string >& SegOutFilenames,
 						std::vector<LabelImageType1::PixelType>& labelsList,
-						std::string TempFolder, unsigned MaxScale );
+						std::string TempFolder, unsigned MaxScale,
+						itk::SizeValueType& NumberOfCells );
 	std::string SegmentNucleiInBBox( InputImageType1::Pointer InputImage, LabelImageType1::Pointer CCImage,
 					 BBoxType BBox, unsigned MaxScale,
-					 LabelImageType1::PixelType CurrentBBLabel, std::string TempFolder );
+					 LabelImageType1::PixelType CurrentBBLabel, std::string TempFolder,
+					 LabelImageType1::PixelType& NumCells );
 	std::string CheckWritePermissionsNCreateTempFolder();
+	template <typename LabelPixelType>  void
+		StitchLabels( std::vector< std::string >& TempSegFiles );
 #endif //PROJPROC_WITH_MONT_SEG
 
 	void mmSegmentation(int intChannel, int labChannel);
