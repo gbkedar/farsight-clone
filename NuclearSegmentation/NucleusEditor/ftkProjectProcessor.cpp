@@ -440,7 +440,7 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
   ILabelsBBoxes = ReSegmentCCs( InputImage, CCImage, SegOutFilenames, labelsList, TempFolder, MaxScale,
   				NumberOfCells );
 } //End scoping for CCImage
-  std::cout<<"Segmentation done. Stitching labels together.\n";
+  std::cout<<"Segmentation done. Stitching "<<NumberOfCells<<" labels together.\n";
   if( NumberOfCells < itk::NumericTraits<LabelImageType::PixelType>::max() )
   {
     std::cout<<"Using unsigned short to stitch labels\n";
@@ -645,11 +645,11 @@ std::vector< ftk::ProjectProcessor::BBoxType > ProjectProcessor::ReSegmentCCs
   for( LabelImageType1::PixelType i=0; i<labelsList.size(); ++i )
 #endif
   {
-    LabelImageType1::PixelType NumCells;
+    LabelImageType1::PixelType NumCells=0;
     SegOutFilenames.at(i) = SegmentNucleiInBBox( InputImage, CCImage, OutputBBoxes.at(i), MaxScale,
     						 labelsList.at(i), TempFolder, NumCells );
 #pragma omp critical
-    NumberOfCells += NumCells;
+    NumberOfCells += (itk::SizeValueType)NumCells;
 
   }
   
@@ -779,6 +779,8 @@ std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer Inpu
 	DeleteIter.Set(0);
       }
     }
+    if( labelValue )
+     ++NumCells;
   }
 
   //Generate intermediate file string
