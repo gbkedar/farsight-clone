@@ -413,7 +413,7 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
 	Size[2] = numStacks;
 	BinarizeTile( InputImage, BinaryImage, Start, Size, TempFolder );
     }
-#if 1
+#if 0
   typedef itk::ImageFileWriter< InputImageType1 > BinaryWriterType;
   BinaryWriterType::Pointer binwriter = BinaryWriterType::New();
   binwriter->SetInput( BinaryImage );
@@ -440,10 +440,17 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
   ILabelsBBoxes = ReSegmentCCs( InputImage, CCImage, SegOutFilenames, labelsList, TempFolder, MaxScale,
   				NumberOfCells );
 } //End scoping for CCImage
+  std::cout<<"Segmentation done. Stitching labels together.\n";
   if( NumberOfCells < itk::NumericTraits<LabelImageType::PixelType>::max() )
+  {
+    std::cout<<"Using unsigned short to stitch labels\n";
     StitchLabels<LabelImageType::PixelType>( SegOutFilenames );
+  }
   else if( NumberOfCells < itk::NumericTraits<LabelImageType1::PixelType>::max() )
+  {
     StitchLabels<LabelImageType1::PixelType>( SegOutFilenames );
+    std::cout<<"Using unsigned int to stitch labels\n";
+  }
   else
   {
     std::cout	<<"More than "<<itk::NumericTraits<LabelImageType1::PixelType>::max()
@@ -789,7 +796,7 @@ std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer Inpu
   {
     std::cerr <<  "Write for intermediate labels failed" << excp << std::endl;
   }
-  free(DataPtr);
+  //free(DataPtr);
   delete newNucSeg;
   return OutFile;
 }

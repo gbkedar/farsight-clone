@@ -294,6 +294,9 @@ template <typename LabelPixelType>  void
   OutputLabelImage->Allocate();
   OutputLabelImage->FillBuffer(0);
   OutputLabelImage->Update();
+  MontageIteratorType SetZeroIter( OutputLabelImage, OutputLabelImage->GetRequestedRegion() );
+  for( SetZeroIter.GoToBegin(); !SetZeroIter.IsAtEnd(); ++SetZeroIter )
+    SetZeroIter.Set(0);
 
   itk::SizeValueType NumFilesToStitch = TempSegFiles.size();
   LabelPixelType NumLabelsUsed = 0;
@@ -309,16 +312,16 @@ template <typename LabelPixelType>  void
   {
     std::string CurrentFilename = ftk::GetFilenameFromFullPath( TempSegFiles.at(i) );
     //Get the offset from the filename
-    size_t found = CurrentFilename.find_first_of( "_" );
+    unsigned found = CurrentFilename.find_first_of( "_" );
     std::string ext = CurrentFilename.substr( found+1 );
-    found = CurrentFilename.find_first_of( "_" );
-    std::string num1 = ext.substr( found-1 );
+    found =  ext.find_first_of( "_" );
+    std::string num1 = ext.substr( 0, found );
     ext = ext.substr( found+1 );
-    found = CurrentFilename.find_first_of( "_" );
-    std::string num2 = ext.substr( found-1 );
+    found =  ext.find_first_of( "_" );
+    std::string num2 = ext.substr( 0, found );
     ext = ext.substr( found+1 );
-    found = CurrentFilename.find_first_of( "_" );
-    std::string num3 = ext.substr( found-1 );
+    found =  ext.find_first_of( "." );
+    std::string num3 = ext.substr( 0, found );
     typename OutputLabelsType::IndexType OffSet;
     OffSet[0] = std::atoll( num1.c_str() );
     OffSet[1] = std::atoll( num2.c_str() );
@@ -345,6 +348,7 @@ template <typename LabelPixelType>  void
     for( allLabelsIt = allLabels.begin(); allLabelsIt != allLabels.end(); allLabelsIt++ )
     {
       LabelGeometryImageFilterType::LabelPixelType labelValue = *allLabelsIt;
+      if( !labelValue ) continue; //Skip 0
       std::vector< LabelImageType::IndexType > LabelPixels = LabelGeometryFilter->GetPixelIndices(labelValue);
       LabelPixelType CurrentMontageLabel;
 #pragma omp critical
