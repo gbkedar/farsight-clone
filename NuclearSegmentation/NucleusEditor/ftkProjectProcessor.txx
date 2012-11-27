@@ -294,9 +294,6 @@ template <typename LabelPixelType>  void
   OutputLabelImage->Allocate();
   OutputLabelImage->FillBuffer(0);
   OutputLabelImage->Update();
-  MontageIteratorType SetZeroIter( OutputLabelImage, OutputLabelImage->GetRequestedRegion() );
-  for( SetZeroIter.GoToBegin(); !SetZeroIter.IsAtEnd(); ++SetZeroIter )
-    SetZeroIter.Set(0);
 
   itk::SizeValueType NumFilesToStitch = TempSegFiles.size();
   LabelPixelType NumLabelsUsed = 0;

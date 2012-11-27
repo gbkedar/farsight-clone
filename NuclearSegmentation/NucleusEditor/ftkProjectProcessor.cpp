@@ -375,10 +375,6 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
   BinaryImage->Allocate();
   BinaryImage->FillBuffer(0);
   BinaryImage->Update();
-  //FillBuffer(0) is not setting every pixel to 0
-  BinMontageIteratorType BinImIt( BinaryImage, BinaryImage->GetLargestPossibleRegion() );
-  for( BinImIt.GoToBegin(); !BinImIt.IsAtEnd(); ++BinImIt )
-    BinImIt.Set(0);
 
 #ifdef _OPENMP
   //Use 95% of the cores by default n save a little for the OS
