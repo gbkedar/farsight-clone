@@ -788,31 +788,19 @@ int yousef_nucleus_seg::getConnCompImage(unsigned short *IM, int connectivity, i
 	
     //write the output of the labeling CC filter into our input image
 	std::cout << "Writing output of relabel coloring filter to input image" << std::endl;
-	// At least 3 connected components in the image, otherwise for the noise tiles, the seed detection will end up detecting many seeds. This parame
 	int numObj = relabel->GetNumberOfObjects();
-	if( numObj > 2 )
-	{
-		int mx;
-		IteratorType iterator2(relabel->GetOutput(),relabel->GetOutput()->GetRequestedRegion());
-		for(size_t i=0; i<r*c*z; i++)
-		{			
-			
-			mx = iterator2.Get();	
-			if(mx == -1)
-				IM[i] = 0;
-			else
-				IM[i] = mx;
-			++iterator2;	
-		}
-	}
-	else
-	{
-		for( size_t i=0; i<r*c*z; ++i )
-		{
+	int mx;
+	IteratorType iterator2(relabel->GetOutput(),relabel->GetOutput()->GetRequestedRegion());
+	for(size_t i=0; i<r*c*z; i++)
+	{			
+		
+		mx = iterator2.Get();	
+		if(mx == -1)
 			IM[i] = 0;
-		}
+		else
+			IM[i] = mx;
+		++iterator2;	
 	}
-			
 
 	//return the number of CCs
 	std::cout << "Returning number of connected components" << std::endl;
