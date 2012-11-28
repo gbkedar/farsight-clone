@@ -317,7 +317,7 @@ template <typename LabelPixelType>  void
     found =  ext.find_first_of( "_" );
     std::string num2 = ext.substr( 0, found );
     ext = ext.substr( found+1 );
-    found =  ext.find_first_of( "." );
+    found =  ext.find_first_of( "_" );
     std::string num3 = ext.substr( 0, found );
     typename OutputLabelsType::IndexType OffSet;
     OffSet[0] = std::atoll( num1.c_str() );
@@ -369,6 +369,17 @@ template <typename LabelPixelType>  void
       std::cout << "Error in removing file. " << ex.what() << '\n';
     }
   }
+
+#if 0
+  typedef itk::ImageFileWriter< OutputLabelsType > CCWriterType;
+  typename CCWriterType::Pointer ccwriter = CCWriterType::New();
+  ccwriter->SetInput( OutputLabelImage );
+  std::string ccWriterStr = ftk::GetFilePath(TempSegFiles.at(0)) + "/cc_out.nrrd";
+  ccwriter->SetFileName( ccWriterStr.c_str() );
+  try{ ccwriter->Update(); }
+  catch( itk::ExceptionObject & excp ){ std::cerr << excp << std::endl; }
+#endif
+
   //All files are done delete folder
   std::string TempFolder = ftk::GetFilePath( TempSegFiles.at(0) );
   boost::filesystem::path RemoveFolder = TempFolder.c_str();

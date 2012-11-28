@@ -330,7 +330,12 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
   itk::SizeValueType TileSize = 1600;	//Default tile size for 2D
   unsigned MaxScale = 50; //Default padding around connected components for resegmentation
 			  //Also the default overlap between tiles when binarizing
-			  //Should read this from the project definition
+  for(unsigned i=0; i<definition->nuclearParameters.size(); ++i)
+     if(definition->nuclearParameters.at(i).name == "max_scale")
+        MaxScale = ((double)definition->nuclearParameters.at(i).value * 10);
+
+  std::cout<<"Using max scale "<<MaxScale<<std::endl;
+
   const Image::Info *info = inputImage->GetImageInfo();
   itk::SizeValueType numStacks = info->numZSlices;  //z-direction
   itk::SizeValueType numRows = info->numRows;	    //y-direction
@@ -492,6 +497,8 @@ void ProjectProcessor::BinarizeTile( InputImageType1::Pointer InputImage,
 {
   typedef itk::RegionOfInterestImageFilter< InputImageType1, InputImageType1 > ROIFilterType;
   typedef itk::Image< unsigned short,  3 >  BinaryImageType;
+  typedef itk::ConnectedComponentImageFilter< BinaryImageType, BinaryImageType >
+  								ConnectedComponentFilterType;
   typedef itk::ImageRegionConstIterator< BinaryImageType > BinOutConstIteratorType;
   typedef itk::ImageRegionIteratorWithIndex< InputImageType1 > BinMontageIteratorType;
 
@@ -560,27 +567,44 @@ void ProjectProcessor::BinarizeTile( InputImageType1::Pointer InputImage,
   BinaryImageType::Pointer BinIm = FTKOImage->
 					GetItkPtr< BinaryImageType::PixelType >( 0, 0, ftk::Image::DEFAULT );
 
-  BinOutConstIteratorType BinOutConstIter( BinIm, BinIm->GetLargestPossibleRegion() );
-  BinMontageIteratorType BinMontagIter( BinaryImage, BinaryImage->GetLargestPossibleRegion() );
+  //Check if the tile has more than 3 connected components
+  ConnectedComponentFilterType::Pointer connectedComponentFilter = ConnectedComponentFilterType::New();
+  connectedComponentFilter->SetInput( BinIm );
+  connectedComponentFilter->FullyConnectedOn();
+  try
+  {
+    connectedComponentFilter->Update();
+  }
+  catch( itk::ExceptionObject & excp )
+  {
+    std::cerr <<  "CC filter for initial binarization failed" << excp << std::endl;
+  }
 
-  //Copy output of tile into montage
-  for( itk::SizeValueType k=0; k<numStacks; ++k )
-    for( itk::SizeValueType l=Start[1]; l<(Start[1]+TileSize); ++l )
-      for( itk::SizeValueType m=Start[0]; m<(Start[0]+TileSize); ++m )
-      {
-	BinaryImageType::IndexType FtkBinIndex;
-	FtkBinIndex[0] = m-Start[0];
-	FtkBinIndex[1] = l-Start[1];
-	FtkBinIndex[2] = k;
-	InputImageType1::IndexType BinaryImIndex;
-	BinaryImIndex[0] = m;
-	BinaryImIndex[1] = l;
-	BinaryImIndex[2] = k;
-	BinOutConstIter.SetIndex( FtkBinIndex );
-	BinMontagIter.SetIndex( BinaryImIndex );
-	if( BinOutConstIter.Get() )
-	  BinMontagIter.Set( 255 );
-      }
+  //Tiles with only background usually have 1-3 CCs
+  if( connectedComponentFilter->GetObjectCount() > 3  )
+  {
+    BinOutConstIteratorType BinOutConstIter( BinIm, BinIm->GetLargestPossibleRegion() );
+    BinMontageIteratorType BinMontagIter( BinaryImage, BinaryImage->GetLargestPossibleRegion() );
+
+    //Copy output of tile into montage
+    for( itk::SizeValueType k=Start[2]; k<numStacks; ++k )
+      for( itk::SizeValueType l=Start[1]; l<(Start[1]+TileSize); ++l )
+        for( itk::SizeValueType m=Start[0]; m<(Start[0]+TileSize); ++m )
+        {
+	  BinaryImageType::IndexType FtkBinIndex;
+	  FtkBinIndex[0] = m-Start[0];
+	  FtkBinIndex[1] = l-Start[1];
+	  FtkBinIndex[2] = k;
+	  InputImageType1::IndexType BinaryImIndex;
+	  BinaryImIndex[0] = m;
+	  BinaryImIndex[1] = l;
+	  BinaryImIndex[2] = k;
+	  BinOutConstIter.SetIndex( FtkBinIndex );
+	  BinMontagIter.SetIndex( BinaryImIndex );
+	  if( BinOutConstIter.Get() )
+	    BinMontagIter.Set( 255 );
+        }
+  }
 #if 0
   typedef itk::ImageFileWriter< BinaryImageType > BinaryWriterType;
   BinaryWriterType::Pointer binwriter = BinaryWriterType::New();
@@ -675,13 +699,16 @@ std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer Inpu
   Start[1] = (BBox[2]-MaxScale) > 0 ? (BBox[2]-MaxScale) : 0;
   Start[2] = (BBox[4]-MaxScale) > 0 ? (BBox[4]-MaxScale) : 0;
   InputImageType1::SizeType Size;
-  Size[0] = (BBox[1]+MaxScale) < ImageSize[0] ? (BBox[1]+2*MaxScale-BBox[0]) : (ImageSize[0]-Start[0]);
-  Size[1] = (BBox[3]+MaxScale) < ImageSize[1] ? (BBox[3]+2*MaxScale-BBox[2]) : (ImageSize[1]-Start[1]);
-  Size[2] = (BBox[5]+MaxScale) < ImageSize[2] ? (BBox[5]+2*MaxScale-BBox[4]) : (ImageSize[2]-Start[2]);
+  Size[0] = (BBox[1]+MaxScale) < ImageSize[0] ? (BBox[1]+2*MaxScale-BBox[0]) : (ImageSize[0]-Start[0]-1);
+  Size[1] = (BBox[3]+MaxScale) < ImageSize[1] ? (BBox[3]+2*MaxScale-BBox[2]) : (ImageSize[1]-Start[1]-1);
+  Size[2] = (BBox[5]+MaxScale) < ImageSize[2] ? (BBox[5]+2*MaxScale-BBox[4]) : (ImageSize[2]-Start[2]-1);
+  if( !Size[0] ) Size[0] = 1;
+  if( !Size[1] ) Size[1] = 1;
+  if( !Size[2] ) Size[2] = 1;
   //Crop Input Image
   unsigned char *DataPtr;
   DataPtr = (unsigned char*)malloc( sizeof(unsigned char)*Size[0]*Size[1]*Size[2] );
-{ //Scoping for temp cropimage
+//{ //Scoping for temp cropimage
     InputImageType1::RegionType CroppedRegion;
     CroppedRegion.SetSize ( Size );
     CroppedRegion.SetIndex( Start );
@@ -702,7 +729,7 @@ std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer Inpu
       DataPtr[Index] = PixBuf.Get();
       ++Index;
     }
-} //End scoping for temp cropimage
+//} //End scoping for temp cropimage
 
   //Create binarization object
   ftk::NuclearSegmentation * newNucSeg = new ftk::NuclearSegmentation();
@@ -718,7 +745,8 @@ std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer Inpu
   color.assign(3,255);
   FTKIImage->AppendChannelFromData3D( (void*)DataPtr,
 					itk::ImageIOBase::UCHAR, sizeof(unsigned char),
-					Size[0], Size[1], Size[2], "nuc", color, false );
+					Size[0], Size[1], Size[2], "nuc", color, true );
+  free( DataPtr );
   newNucSeg->SetInput( FTKIImage, "nuc", 0 );
 
   //Run Binarization
@@ -762,7 +790,7 @@ std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer Inpu
     CurrentCentroid[1] += Start[1];
     CurrentCentroid[2] += Start[2];
     CCsIter.SetIndex( CurrentCentroid );
-    if( CCsIter.Get()!=CurrentBBLabel )
+    if( labelValue && CCsIter.Get()!=CurrentBBLabel ) //No need to overwrite label 0
     {
       //Delete the label
       std::vector< IntermediateLabelType::IndexType > LabelPixels =
@@ -775,15 +803,36 @@ std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer Inpu
 	DeleteIter.Set(0);
       }
     }
-    if( labelValue )
+    else if( labelValue )
      ++NumCells;
   }
 
   //Generate intermediate file string
   std::string OutFile;
   std::stringstream filess;
-  filess << Start[0] << "_" <<Start[1] << "_" << Start[2];
+  filess << Start[0] << "_" <<Start[1] << "_" << Start[2] << "_" << CurrentBBLabel;
   OutFile = TempFolder + "/Temp_" + filess.str() + ".tif" ;
+
+  if( !NumCells )
+  {
+    std::cout<<"Re-segmentation failed on current crop region"<<CroppedRegion<<std::endl;
+#if 0
+    typedef itk::ImageFileWriter< InputImageType1 > InputWriterType;
+    InputWriterType::Pointer failedSegWriter = InputWriterType::New();
+    std::string FailFile;
+    FailFile = TempFolder + "/Seg_Failed_file_" + filess.str() + ".tif" ;
+    failedSegWriter->SetFileName( FailFile.c_str() );
+    failedSegWriter->SetInput( CropImageFilter->GetOutput() );
+    try
+    {
+      failedSegWriter->Update();
+    }
+    catch( itk::ExceptionObject & excp )
+    {
+      std::cerr <<  "Write for failed segmentation file failed" << excp << std::endl;
+    }
+#endif
+  }
 
   //Write intermediate file
   WriterType::Pointer writer = WriterType::New();
@@ -794,12 +843,9 @@ std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer Inpu
   {
     std::cerr <<  "Write for intermediate labels failed" << excp << std::endl;
   }
-  //free(DataPtr);
   delete newNucSeg;
   return OutFile;
 }
-
-
 
 #endif //PROJPROC_WITH_MONT_SEG
 

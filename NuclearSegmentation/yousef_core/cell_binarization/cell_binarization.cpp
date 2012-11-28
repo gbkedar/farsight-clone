@@ -827,7 +827,7 @@ void MinErrorThresholding(unsigned char* img, float* alpha_B, float* alpha_A, fl
 	}
 	/*typedef itk::ImageFileWriter< OutputImageType > WriterType;
 	WriterType::Pointer writer = WriterType::New();
-	writer->SetFileName("minError.mhd");
+	writer->SetFileName("minError.tif");
 	writer->SetInput(filter->GetOutput());
 	writer->Update();*/
 

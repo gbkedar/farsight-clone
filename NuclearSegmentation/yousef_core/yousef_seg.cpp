@@ -258,7 +258,7 @@ void yousef_nucleus_seg::runBinarization(unsigned short number_of_bins)
 	origin2[2] = 0;    
     im2->SetOrigin( origin2 );
 	
-    InputImageType::IndexType start2;
+    InputImageType2::IndexType start2;
     start2[0] =   0;  // first index on X
     start2[1] =   0;  // first in dex on Y    
 	start2[2] =   0;  // first index on Z    
