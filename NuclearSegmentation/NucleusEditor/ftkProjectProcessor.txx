@@ -136,7 +136,8 @@ template <typename InputPixelType, typename LabelPixelType>  void
 	std::cout<<"Using "<<n_thr<<" threads\n"<<std::flush;
 #if _OPENMP >= 200805L
 	omp_set_max_active_levels(1);
-	#pragma omp parallel for num_threads(n_thr)
+	#pragma omp parallel for num_threads(n_thr) \
+	shared( labelsList, FVector, LabelImage, InputImage, LabelStatisticsImageFilter )
 	for( LabelPixelType i=0; i<labelsList.size(); ++i )
 #else
 	#pragma omp parallel for num_threads(n_thr)
@@ -298,6 +299,8 @@ template <typename LabelPixelType>  void
   itk::SizeValueType NumFilesToStitch = TempSegFiles.size();
   LabelPixelType NumLabelsUsed = 0;
 #ifdef _OPENMP
+   #pragma omp parallel for num_threads(n_thr) \
+   shared( TempSegFiles, OutputLabelImage, NumLabelsUsed )
 #if _OPENMP >= 200805L
   for( typename OutputLabelsType::PixelType i=0; i<NumFilesToStitch; ++i )
 #else

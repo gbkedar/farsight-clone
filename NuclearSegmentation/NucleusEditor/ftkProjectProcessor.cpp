@@ -388,7 +388,8 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
   std::cout<<"Using "<<n_thr<<" threads\n"<<std::flush;
 #if _OPENMP >= 200805L
   omp_set_max_active_levels(1);
-  #pragma omp parallel for num_threads(n_thr) collapse(2) schedule(dynamic,1)
+  #pragma omp parallel for num_threads(n_thr) collapse(2) schedule(dynamic,1) \
+  	shared( InputImage, BinaryImage, TileSize, MaxScale, numRows, numColumns, numStacks )
   for( itk::SizeValueType i=0; i<NumVerticalTiles; ++i )
 #else
   #pragma omp parallel for num_threads(n_thr)
@@ -655,7 +656,8 @@ std::vector< ftk::ProjectProcessor::BBoxType > ProjectProcessor::ReSegmentCCs
   //Segment images and write outputs
 #ifdef _OPENMP
 #if _OPENMP >= 200805L
-  #pragma omp parallel for num_threads(n_thr) schedule(dynamic,1)
+  #pragma omp parallel for num_threads(n_thr) schedule(dynamic,1) \
+  shared( InputImage, CCImage, OutputBBoxes, MaxScale, labelsList, TempFolder, NumberOfCells )
   for( LabelImageType1::PixelType i=0; i<labelsList.size(); ++i )
 #else
   #pragma omp parallel for num_threads(n_thr)

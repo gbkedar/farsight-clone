@@ -2,8 +2,6 @@ ADD_EXECUTABLE( segment_nuclei yousef_main.cpp)
 
 ADD_EXECUTABLE( compute_nuclei_features compute_nuclei_features_main.cpp)
 
-ADD_EXECUTABLE( compute_associative_measures compute_associative_measures.cpp)
-
 ADD_EXECUTABLE( classify_nuclei split_by_class.cpp )
 ADD_EXECUTABLE( graph_coloring_on_output graph_coloring_on_output.cpp )
 
@@ -23,8 +21,6 @@ INSTALL( TARGETS SomaExtraction DESTINATION ${INSTALL_BIN_DIR} )
 TARGET_LINK_LIBRARIES( segment_nuclei  Yousef_Nucleus_Seg     ${ITK_LIBRARIES} )#      ${ITK_LIBRARIES} )
 
 TARGET_LINK_LIBRARIES( compute_nuclei_features NuclearSegmentation ftkCommon ftkFeatures     ${ITK_LIBRARIES} )#      ${ITK_LIBRARIES} )
-
-TARGET_LINK_LIBRARIES( compute_associative_measures ftkCommon ftkFeatures NuclearSegmentation     ${ITK_LIBRARIES} )#       ${ITK_LIBRARIES} )
 
 TARGET_LINK_LIBRARIES( classify_nuclei ftkCommon ftkFeatures NuclearSegmentation )
 
@@ -46,8 +42,6 @@ ENDIF(BUILD_OPENCL)
 INSTALL( TARGETS segment_nuclei DESTINATION ${INSTALL_BIN_DIR} )
 
 INSTALL( TARGETS compute_nuclei_features DESTINATION ${INSTALL_BIN_DIR} )
-
-INSTALL( TARGETS compute_associative_measures DESTINATION ${INSTALL_BIN_DIR} )
 
 INSTALL( TARGETS classify_nuclei DESTINATION ${INSTALL_BIN_DIR} )
 
