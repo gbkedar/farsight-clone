@@ -126,9 +126,17 @@ void NuclearAssociationRules< InputImageType, LabelImageType >::Compute()
 		LabelStatisticsImageFilter->GetNumberOfObjects();
 
 	//Get the list of labels
-	for( typename LabelImageType::PixelType LabelIndex=1; LabelIndex<NumLabels; ++LabelIndex )
-		if( !LabelStatisticsImageFilter->GetCount(LabelIndex) ) continue;
-		else LabelsList.push_back( LabelIndex );
+	for( typename ValidLabelValuesType::const_iterator
+		vIt=LabelStatisticsImageFilter->GetValidLabelValues().begin();
+		vIt != LabelStatisticsImageFilter->GetValidLabelValues().end(); ++vIt )
+	{
+		if ( LabelStatisticsImageFilter->HasLabel(*vIt) )
+		{
+			if( *vIt ) LabelsList.push_back( *vIt );
+		}
+		else
+			std::cout<<"The id "<<*vIt<<" is present but was discarded\n";
+	}
 
 	numLabels = (typename LabelImageType::PixelType)LabelsList.size();
 
@@ -194,7 +202,7 @@ void NuclearAssociationRules< InputImageType, LabelImageType >::Compute()
 #ifndef _MSC_VER
 			int n_thr = 0.95*omp_get_max_threads();
 			std::cout<<"Number of threads "<<n_thr<<std::endl;
-			itk::MultiThreader::SetGlobalDefaultNumberOfThreads(1);
+			itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
 			#pragma omp parallel for num_threads(n_thr) 
 #endif
 #endif
@@ -205,7 +213,7 @@ void NuclearAssociationRules< InputImageType, LabelImageType >::Compute()
 			}
 #ifdef _OPENMP
 #ifndef _MSC_VER
-			itk::MultiThreader::SetGlobalDefaultNumberOfThreads(n_thr);
+			itk::MultiThreader::SetGlobalMaximumNumberOfThreads(n_thr);
 #endif
 #endif
 		}

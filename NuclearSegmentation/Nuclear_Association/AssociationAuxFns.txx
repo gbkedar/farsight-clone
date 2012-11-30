@@ -52,7 +52,8 @@ template < typename InputImageType , typename LabelImageType >
 std::vector<float> compute_ec_features( typename itk::SmartPointer<InputImageType> input_image,
 					typename itk::SmartPointer<LabelImageType> inp_labeled,
 					int number_of_rois, typename InputImageType::PixelType thresh, int surr_dist,
-					int inside_dist ){
+					int inside_dist )
+{
 	std::vector< float > qfied_num;
 	std::vector< typename LabelImageType::PixelType > labelsList;
 
@@ -62,6 +63,7 @@ std::vector<float> compute_ec_features( typename itk::SmartPointer<InputImageTyp
 	typedef itk::SignedDanielssonDistanceMapImageFilter< FloatImageType, FloatImageType > DTFilter;
 	typedef itk::ImageRegionIteratorWithIndex< FloatImageType > IteratorTypeFloat;
 	typedef itk::LabelStatisticsImageFilter< InputImageType, LabelImageType > LabelStatisticsImageFilterType;
+	typedef typename LabelStatisticsImageFilterType::ValidLabelValuesContainerType ValidLabelValuesType;
 	typedef itk::ImageRegionConstIterator< FloatImageType > ConstIteratorTypeFloat;
 
 	typename LabelImageType::SizeType sizee;
@@ -79,25 +81,41 @@ std::vector<float> compute_ec_features( typename itk::SmartPointer<InputImageTyp
 	try{ LabelStatisticsImageFilter->Update(); }
 	catch( itk::ExceptionObject & excp ){ std::cerr << excp << std::endl; }
 
-	const typename LabelImageType::PixelType NumLabels = LabelStatisticsImageFilter->GetNumberOfObjects();
-	std::vector< std::vector< typename LabelImageType::IndexType > > LabelIndices;
-	std::vector< typename LabelImageType::IndexType > Centroids;
-	LabelIndices.resize( NumLabels );
-	Centroids.resize( NumLabels );
-
 	//Store the label indices and centroids
+	std::cout<<"Getting valid labels\n";
+	for( typename ValidLabelValuesType::const_iterator
+		vIt=LabelStatisticsImageFilter->GetValidLabelValues().begin();
+		vIt != LabelStatisticsImageFilter->GetValidLabelValues().end(); ++vIt )
+	{
+		typename LabelImageType::PixelType LabelIndex=(*vIt);
+		if( !LabelStatisticsImageFilter->HasLabel(*vIt) ) continue;
+		labelsList.push_back( LabelIndex );
+	}
+	std::sort( labelsList.begin(), labelsList.end() );
+
+	std::cout<<std::endl<<"The number of labels present: "<<labelsList.size()<<std::endl;
+
+	itk::SizeValueType roi_list_size =
+				((itk::SizeValueType)number_of_rois*labelsList.size());
+	std::vector<double> quantified_numbers_cell( roi_list_size, 0.0 );
+	std::cout<<"Bounding boxes computed"<<std::endl;
+
 #ifdef _OPENMP
-#ifndef _MSC_VER
 	int n_thr = 0.95*omp_get_max_threads();  //Use 95% of the cores by default n save a little for the OS
 	std::cout<<"Number of threads "<<n_thr<<std::endl;
-	itk::MultiThreader::SetGlobalDefaultNumberOfThreads(1);
+	itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
 	#pragma omp parallel for num_threads(n_thr)
+#if _OPENMP >= 200805L
+	for( typename LabelImageType::PixelType i=0; i<labelsList.size(); ++i )
+#else
+	for( itk::IndexValueType i=0; i<labelsList.size(); ++i )
 #endif
+	for( typename LabelImageType::PixelType i=0; i<labelsList.size(); ++i )
 #endif
-	for( typename LabelImageType::PixelType LabelIndex=1; LabelIndex<NumLabels; ++LabelIndex ){
-		if( !LabelStatisticsImageFilter->GetCount(LabelIndex) ) continue; //No label less than 5 pix
-		typename LabelStatisticsImageFilterType::BoundingBoxType BoundBox;
-		BoundBox = LabelStatisticsImageFilter->GetBoundingBox( LabelIndex );
+	{
+		typename LabelImageType::PixelType LabelIndex = labelsList.at(i);
+		typename LabelStatisticsImageFilterType::BoundingBoxType BoundBox =
+				LabelStatisticsImageFilter->GetBoundingBox( labelsList.at(i) ); 
 		typename LabelImageType::IndexType Start;
 		Start[0] = BoundBox[0]; Start[1] = BoundBox[2]; Start[2] = BoundBox[4];
 		typename LabelImageType::SizeType Size;
@@ -108,84 +126,63 @@ std::vector<float> compute_ec_features( typename itk::SmartPointer<InputImageTyp
 		CroppedRegion.SetSize ( Size  );
 		CroppedRegion.SetIndex( Start );
 		IteratorType PixBuf( inp_labeled, CroppedRegion );
-		double cen_x=0, cen_y=0, cen_z=0;
+
+		//Store the indices and the centroids
+		double centroid_x, centroid_y, centroid_z;
+		std::vector< typename LabelImageType::IndexType > LabelIndices;
 		itk::SizeValueType pixel_count=0;
 		for ( PixBuf.GoToBegin(); !PixBuf.IsAtEnd(); ++PixBuf )
-			if( PixBuf.Get() == LabelIndex ){
+			if( PixBuf.Get() == LabelIndex )
+			{
 				typename LabelImageType::IndexType CurIn = PixBuf.GetIndex();
-				cen_x += CurIn[0]; cen_y += CurIn[1]; cen_z += CurIn[2]; ++pixel_count;
-				#pragma omp critical
-				LabelIndices.at(LabelIndex).push_back( CurIn );				
+				centroid_x += CurIn[0];
+				centroid_y += CurIn[1];
+				centroid_z += CurIn[2];
+				++pixel_count;
+				LabelIndices.push_back( CurIn );				
 			}
-		Centroids.at(LabelIndex)[0] = round(cen_x/pixel_count);
-		Centroids.at(LabelIndex)[1] = round(cen_y/pixel_count);
-		Centroids.at(LabelIndex)[2] = image_is_3d ? round(cen_z/pixel_count) : 0;
-		#pragma omp critical
-		if( LabelIndices.at(LabelIndex).size() )
-			labelsList.push_back( LabelIndex );
-	}
-	std::sort( labelsList.begin(), labelsList.end() );
-	std::cout<<std::endl<<"The number of labels present: "<<labelsList.size()<<std::endl;
+		centroid_x = round(centroid_x/(double)pixel_count);
+		centroid_y = round(centroid_y/(double)pixel_count);
+		centroid_z = image_is_3d ? round(centroid_z/(double)pixel_count) : 0;
 
-	itk::SizeValueType roi_list_size =
-				((itk::SizeValueType)number_of_rois*labelsList.size()*2);
-	std::vector<double> quantified_numbers_cell( roi_list_size, 0.0 );
-	std::cout<<"Bounding boxes computed"<<std::endl;
-
-#ifdef _OPENMP
-#ifndef _MSC_VER
-	omp_set_nested(1);
-	#pragma omp parallel for num_threads(n_thr)
-#endif
-#endif
-	for( typename LabelImageType::PixelType i=0; i<labelsList.size(); ++i ){
-		itk::SizeValueType ind = i;
-		//Get label indices
-		double centroid_x, centroid_y, centroid_z;
-		centroid_x = Centroids.at( labelsList.at(i) )[0];
-		centroid_y = Centroids.at( labelsList.at(i) )[1];
-		centroid_z = Centroids.at( labelsList.at(i) )[2];
 		//Create vnl array 3xN( label indicies )
-		vnl_matrix<double> B( 3, LabelIndices.at(labelsList.at(i)).size());
+		vnl_matrix<double> B( 3, pixel_count );
 
-		typename LabelStatisticsImageFilterType::BoundingBoxType boundbox =
-			LabelStatisticsImageFilter->GetBoundingBox( labelsList.at(i) ); 
-
-		FloatImageType::Pointer inp_lab = FloatImageType::New();
-		FloatImageType::PointType origint; origint[0] = 0; origint[1] = 0; origint[2] = 0;
-		inp_lab->SetOrigin( origint );
+		FloatImageType::Pointer inp_lab_float = FloatImageType::New();
+		FloatImageType::PointType origint;
+		origint[0] = 0; origint[1] = 0; origint[2] = 0;
+		inp_lab_float->SetOrigin( origint );
 		FloatImageType::IndexType startt;
 		startt[0] = 0;  // first index on X
 		startt[1] = 0;  // first index on Y
 		startt[2] = 0;  // first index on Z
 		FloatImageType::SizeType  sizet;
-		sizet[0] = boundbox[1]-boundbox[0]+2*surr_dist+2;  // size along X
-		sizet[1] = boundbox[3]-boundbox[2]+2*surr_dist+2;  // size along Y
-		sizet[2] = image_is_3d ? (boundbox[5]-boundbox[4]+2*surr_dist+2) : 1;  // size along Z
+		sizet[0] = BoundBox[1]-BoundBox[0]+2*surr_dist+2;  // size along X
+		sizet[1] = BoundBox[3]-BoundBox[2]+2*surr_dist+2;  // size along Y
+		sizet[2] = image_is_3d ? (BoundBox[5]-BoundBox[4]+2*surr_dist+2) : 1;  // size along Z
 		FloatImageType::RegionType regiont;
 		regiont.SetSize( sizet );
 		regiont.SetIndex( startt );
-		inp_lab->SetRegions( regiont );
-		inp_lab->Allocate();
-		inp_lab->FillBuffer(0.0);
-		inp_lab->Update();
-		IteratorTypeFloat iterator444 ( inp_lab, inp_lab->GetRequestedRegion() );
+		inp_lab_float->SetRegions( regiont );
+		inp_lab_float->Allocate();
+		inp_lab_float->FillBuffer(0.0);
+		inp_lab_float->Update();
 
+		IteratorTypeFloat iterator444 ( inp_lab_float, inp_lab_float->GetRequestedRegion() );
 		//Populate matrix with deviations from the centroid for principal axes and
 		//at the same time set up distance-transform computation
 		itk::SizeValueType ind1=0;
 		for( typename std::vector< typename LabelImageType::IndexType >::iterator itPixind =
-				LabelIndices.at(labelsList.at(i)).begin();
-				itPixind!=LabelIndices.at(labelsList.at(i)).end(); ++itPixind ){
-			InpIteratorType iterator3( input_image, input_image->GetRequestedRegion() );
-			iterator3.SetIndex( *itPixind );
-			B(0,(ind1)) = iterator3.GetIndex()[0]-centroid_x;
-			B(1,(ind1)) = iterator3.GetIndex()[1]-centroid_y;
-			B(2,(ind1)) = iterator3.GetIndex()[2]-centroid_z;
+				LabelIndices.begin();
+				itPixind!=LabelIndices.end(); ++itPixind )
+		{
+			B(0,(ind1)) = (*itPixind)[0]-centroid_x;
+			B(1,(ind1)) = (*itPixind)[1]-centroid_y;
+			B(2,(ind1)) = (*itPixind)[2]-centroid_z;
 			FloatImageType::IndexType cur_in;
-			cur_in[0] = iterator3.GetIndex()[0]-boundbox[0]+1+surr_dist;
-			cur_in[1] = iterator3.GetIndex()[1]-boundbox[2]+1+surr_dist;
-			cur_in[2] = image_is_3d ? (iterator3.GetIndex()[2]-boundbox[4]+1+surr_dist) : 0;
+			cur_in[0] = (*itPixind)[0]-BoundBox[0]+1+surr_dist;
+			cur_in[1] = (*itPixind)[1]-BoundBox[2]+1+surr_dist;
+			cur_in[2] = image_is_3d ? ((*itPixind)[2]-BoundBox[4]+1+surr_dist) : 0;
 			iterator444.SetIndex( cur_in );
 			iterator444.Set( 255.0 );
 			++ind1;
@@ -193,51 +190,71 @@ std::vector<float> compute_ec_features( typename itk::SmartPointer<InputImageTyp
 
 		//Compute distance transform for the current object
 		DTFilter::Pointer dt_obj= DTFilter::New() ;
-		dt_obj->SetInput( inp_lab );
+		dt_obj->SetInput( inp_lab_float );
 		dt_obj->SquaredDistanceOff();
 		dt_obj->InsideIsPositiveOff();
-		try{
+		try
+		{
 			dt_obj->Update() ;
-		} catch( itk::ExceptionObject & err ){
+		}
+		catch( itk::ExceptionObject & err )
+		{
 			std::cerr << "Error in Distance Transform: " << err << std::endl;
 		}
 		FloatImageType::Pointer dist_im = dt_obj->GetOutput();
 
 		//Use KLT to compute pricipal axes
-		if(image_is_3d){
-			vnl_matrix<double> B_transp((int)LabelIndices.at(labelsList.at(i)).size(),3);
+		if(image_is_3d)
+		{
+			vnl_matrix<double> B_transp((int)pixel_count,3);
 			B_transp = B.transpose();
 			vnl_matrix<double>  COV(3,3);
 			COV = B * B_transp;
-			double norm = 1.0/(double)LabelIndices.at(labelsList.at(i)).size();
+			double norm = 1.0/(double)pixel_count;
 			COV = COV * norm;
 			//Eigen decomposition
 			vnl_real_eigensystem Eyegun( COV );
 			vnl_matrix<vcl_complex<double> > EVals = Eyegun.D;
-			double Eval1 = vnl_real(EVals)(0,0); double Eval2 = vnl_real(EVals)(1,1); double Eval3 = vnl_real(EVals)(2,2);
+			double Eval1 = vnl_real(EVals)(0,0);
+			double Eval2 = vnl_real(EVals)(1,1);
+			double Eval3 = vnl_real(EVals)(2,2);
 			vnl_double_3x3 EVectMat = Eyegun.Vreal;
 			double V1[3],V2[3],EP_norm[3];
-			if( Eval1 >= Eval3 && Eval2 >= Eval3 ){
-				if( Eval1 >= Eval2 ){
+			if( Eval1 >= Eval3 && Eval2 >= Eval3 )
+			{
+				if( Eval1 >= Eval2 )
+				{
 					V1[0] = EVectMat(0,0); V1[1] = EVectMat(1,0); V1[2] = EVectMat(2,0);
 					V2[0] = EVectMat(0,1); V2[1] = EVectMat(1,1); V2[2] = EVectMat(2,1);
-				} else {
+				}
+				else
+				{
 					V2[0] = EVectMat(0,0); V2[1] = EVectMat(1,0); V2[2] = EVectMat(2,0);
 					V1[0] = EVectMat(0,1); V1[1] = EVectMat(1,1); V1[2] = EVectMat(2,1);
 				}
-			} else if( Eval1 >= Eval2 && Eval3 >= Eval2 ) {
-				if( Eval1 >= Eval3 ){
+			}
+			else if( Eval1 >= Eval2 && Eval3 >= Eval2 )
+			{
+				if( Eval1 >= Eval3 )
+				{
 					V1[0] = EVectMat(0,0); V1[1] = EVectMat(1,0); V1[2] = EVectMat(2,0);
 					V2[0] = EVectMat(0,2); V2[1] = EVectMat(1,2); V2[2] = EVectMat(2,2);
-				} else {
+				}
+				else
+				{
 					V2[0] = EVectMat(0,0); V2[1] = EVectMat(1,0); V2[2] = EVectMat(2,0);
 					V1[0] = EVectMat(0,2); V1[1] = EVectMat(1,2); V1[2] = EVectMat(2,2);
 				}
-			} else {
-				if( Eval2 >= Eval3 ){
+			}
+			else
+			{
+				if( Eval2 >= Eval3 )
+				{
 					V1[0] = EVectMat(0,1); V1[1] = EVectMat(1,1); V1[2] = EVectMat(2,1);
 					V2[0] = EVectMat(0,2); V2[1] = EVectMat(1,2); V2[2] = EVectMat(2,2);
-				} else {
+				}
+				else
+				{
 					V2[0] = EVectMat(0,1); V2[1] = EVectMat(1,1); V2[2] = EVectMat(2,1);
 					V1[0] = EVectMat(0,2); V1[1] = EVectMat(1,2); V1[2] = EVectMat(2,2);
 				}
@@ -256,37 +273,46 @@ std::vector<float> compute_ec_features( typename itk::SmartPointer<InputImageTyp
 			V2[2] = V1[0]*EP_norm[1]-V1[1]*EP_norm[0];
 			//Now we have the point normal form; EP_norm is the normal and
 			//centroid_x, centroid_y, centroid_z is the point
-			//The equation to the plane is EP_norm[0](x-centroid_x)+EP_norm[1](y-centroid_y)+EP_norm[2](z-centroid_z)=0
+			//The equation to the plane is
+			//EP_norm[0](x-centroid_x)+EP_norm[1](y-centroid_y)+EP_norm[2](z-centroid_z)=0
 			double dee = (centroid_x*EP_norm[0]+centroid_y*EP_norm[1]+centroid_z*EP_norm[2])*(-1.00);
 
 			//Iterate through and assign values to each region
 			ConstIteratorTypeFloat pix_buf2( dist_im, dist_im->GetRequestedRegion() );
 			InpIteratorType iterator44( input_image, input_image->GetRequestedRegion() );
 
-			for ( pix_buf2.GoToBegin(); !pix_buf2.IsAtEnd(); ++pix_buf2 ){
+			for ( pix_buf2.GoToBegin(); !pix_buf2.IsAtEnd(); ++pix_buf2 )
+			{
 				//Use pixels that are only within the defined radius from the nucleus
 				double current_distance = pix_buf2.Get();
-				if( (current_distance <= (double)surr_dist) && (current_distance>=(-1*inside_dist)) ){
-					typename LabelImageType::IndexType cur_in;//,cur_in_cpy;
+				if( (current_distance <= (double)surr_dist) && (current_distance>=(-1*inside_dist)) )
+				{
+					typename LabelImageType::IndexType cur_in;
 					double n_vec[3];
-					cur_in[0] = pix_buf2.GetIndex()[0]+boundbox[0]-1-surr_dist;
-					cur_in[1] = pix_buf2.GetIndex()[1]+boundbox[2]-1-surr_dist;
-					cur_in[2] = pix_buf2.GetIndex()[2]+boundbox[4]-1-surr_dist;
-					if( cur_in[0] < 0 || cur_in[1] < 0 || cur_in[2] < 0 ) continue;
-					if( cur_in[0] >= sizee[0] || cur_in[1] >= sizee[1] || cur_in[2] >= sizee[2] ) continue;
+					cur_in[0] = pix_buf2.GetIndex()[0]+BoundBox[0]-1-surr_dist;
+					cur_in[1] = pix_buf2.GetIndex()[1]+BoundBox[2]-1-surr_dist;
+					cur_in[2] = pix_buf2.GetIndex()[2]+BoundBox[4]-1-surr_dist;
+					if( cur_in[0] < 0 || cur_in[1] < 0 || cur_in[2] < 0 )
+						continue;
+					if( cur_in[0] >= sizee[0] || cur_in[1] >= sizee[1] || cur_in[2] >= sizee[2] )
+						continue;
 					iterator44.SetIndex( cur_in );
 					typename InputImageType::PixelType pixel_intensity;
 					pixel_intensity = iterator44.Get();
-					if( pixel_intensity < thresh ) continue;
+					if( pixel_intensity < thresh )
+						continue;
 
 					//The projection of the point on the plane formed by the fist two major axes
 					double xxx, yyy, zzz;
-					xxx = cur_in[0] - EP_norm[0]*((EP_norm[0]*cur_in[0]+EP_norm[1]*cur_in[1]+EP_norm[2]*cur_in[2]+dee)
-									/(EP_norm[0]*EP_norm[0]+EP_norm[1]*EP_norm[1]+EP_norm[2]*EP_norm[2]));
-					yyy = cur_in[1] - EP_norm[1]*((EP_norm[0]*cur_in[0]+EP_norm[1]*cur_in[1]+EP_norm[2]*cur_in[2]+dee)
-									/(EP_norm[0]*EP_norm[0]+EP_norm[1]*EP_norm[1]+EP_norm[2]*EP_norm[2]));
-					zzz = cur_in[2] - EP_norm[2]*((EP_norm[0]*cur_in[0]+EP_norm[1]*cur_in[1]+EP_norm[2]*cur_in[2]+dee)
-									/(EP_norm[0]*EP_norm[0]+EP_norm[1]*EP_norm[1]+EP_norm[2]*EP_norm[2]));
+					xxx = cur_in[0] - EP_norm[0]*
+						((EP_norm[0]*cur_in[0]+EP_norm[1]*cur_in[1]+EP_norm[2]*cur_in[2]+dee)
+						/(EP_norm[0]*EP_norm[0]+EP_norm[1]*EP_norm[1]+EP_norm[2]*EP_norm[2]));
+					yyy = cur_in[1] - EP_norm[1]*
+						((EP_norm[0]*cur_in[0]+EP_norm[1]*cur_in[1]+EP_norm[2]*cur_in[2]+dee)
+						/(EP_norm[0]*EP_norm[0]+EP_norm[1]*EP_norm[1]+EP_norm[2]*EP_norm[2]));
+					zzz = cur_in[2] - EP_norm[2]*
+						((EP_norm[0]*cur_in[0]+EP_norm[1]*cur_in[1]+EP_norm[2]*cur_in[2]+dee)
+						/(EP_norm[0]*EP_norm[0]+EP_norm[1]*EP_norm[1]+EP_norm[2]*EP_norm[2]));
 					//The vector from the centroid to the projected point
 					n_vec[0] = centroid_x-xxx;
 					n_vec[1] = centroid_y-yyy;
@@ -305,44 +331,53 @@ std::vector<float> compute_ec_features( typename itk::SmartPointer<InputImageTyp
 					//Compute bin num
 					if( fin_est_angle<0 )
 						fin_est_angle += (2*M_PI);
-					bin_num = floor(fin_est_angle*number_of_rois/(2*M_PI));
+					bin_num = floor(fin_est_angle*((double)number_of_rois/2)/(2*M_PI));
 
 					//Check which side of the plane the point lies on
 					double v_norm = (cur_in[0]-centroid_x)*(cur_in[0]-centroid_x)
 									+(cur_in[1]-centroid_y)*(cur_in[1]-centroid_y)
 									+(cur_in[2]-centroid_z)*(cur_in[2]-centroid_z);
 					v_norm = sqrt( v_norm );
-					double doot   = (cur_in[0]-centroid_x)*EP_norm[0]/v_norm + (cur_in[1]-centroid_y)*EP_norm[1]/v_norm + (cur_in[2]-centroid_z)*EP_norm[2]/v_norm;
+					double doot   = (cur_in[0]-centroid_x)*EP_norm[0]/v_norm 
+							+ (cur_in[1]-centroid_y)*EP_norm[1]/v_norm 
+							+ (cur_in[2]-centroid_z)*EP_norm[2]/v_norm;
 
 					if( doot<0 )
-						bin_num += number_of_rois;
-					quantified_numbers_cell.at((ind*(2*number_of_rois)+bin_num)) += pixel_intensity;
+						bin_num += ((double)number_of_rois/2);
+					quantified_numbers_cell.at((i*(2*number_of_rois)+bin_num)) += pixel_intensity;
 				}
 			}
-		} else {
+		}
+		else
+		{
 			ConstIteratorTypeFloat pix_buf2( dist_im, dist_im->GetRequestedRegion() );
 			InpIteratorType iterator44( input_image, input_image->GetRequestedRegion() );
 
-			for ( pix_buf2.GoToBegin(); !pix_buf2.IsAtEnd(); ++pix_buf2 ){
+			for ( pix_buf2.GoToBegin(); !pix_buf2.IsAtEnd(); ++pix_buf2 )
+			{
 				//Use pixels that are only within the defined radius from the nucleus
 				double current_distance = pix_buf2.Get();
-				if( (current_distance <= (double)surr_dist) && (current_distance>=(-1*inside_dist)) ){
+				if( (current_distance <= (double)surr_dist) && (current_distance>=(-1*inside_dist)) )
+				{
 					typename LabelImageType::IndexType cur_in;
 					double n_vec[3];
-					cur_in[0] = pix_buf2.GetIndex()[0]+boundbox[0]-1-surr_dist;
-					cur_in[1] = pix_buf2.GetIndex()[1]+boundbox[2]-1-surr_dist;
+					cur_in[0] = pix_buf2.GetIndex()[0]+BoundBox[0]-1-surr_dist;
+					cur_in[1] = pix_buf2.GetIndex()[1]+BoundBox[2]-1-surr_dist;
 					cur_in[2] = 0;
-					if( cur_in[0] < 0 || cur_in[1] < 0 || cur_in[2] < 0 ) continue;
-					if( cur_in[0] >= sizee[0] || cur_in[1] >= sizee[1] || cur_in[2] >= sizee[2] ) continue;
+					if( cur_in[0] < 0 || cur_in[1] < 0 || cur_in[2] < 0 )
+						continue;
+					if( cur_in[0] >= sizee[0] || cur_in[1] >= sizee[1] || cur_in[2] >= sizee[2] )
+						continue;
 					iterator44.SetIndex( cur_in );
 					typename InputImageType::PixelType pixel_intensity;
 					pixel_intensity = iterator44.Get();
-					if( pixel_intensity < thresh ) continue;
+					if( pixel_intensity < thresh )
+						continue;
 					double angle = atan2((centroid_y-cur_in[1]),fabs(centroid_x-cur_in[0]));
 					if( angle<0 )
 						angle += (2*M_PI);
 					typename LabelImageType::PixelType bin_num = floor(angle*number_of_rois/(2*M_PI));
-					quantified_numbers_cell.at((ind*(2*number_of_rois)+bin_num)) += pixel_intensity;
+					quantified_numbers_cell.at(i*number_of_rois+bin_num) += pixel_intensity;
 				}
 			}
 
@@ -351,10 +386,9 @@ std::vector<float> compute_ec_features( typename itk::SmartPointer<InputImageTyp
 #ifdef _OPENMP
 #ifndef _MSC_VER
 omp_set_nested(0);
-itk::MultiThreader::SetGlobalDefaultNumberOfThreads(n_thr);
+itk::MultiThreader::SetGlobalMaximumNumberOfThreads(n_thr);
 #endif
 #endif
-	number_of_rois = number_of_rois*2;
 	std::cout<<"Starting k-means\n";
 	if( labelsList.size() == 1 )
 	{

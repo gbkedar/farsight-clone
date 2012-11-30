@@ -32,34 +32,21 @@
 #include <ftkObject.h>
 #include <ftkFeatures/ftkObjectAssociation.h>
 #include "ftkImage.h"
-#include "itkLabelGeometryImageFilter.h"
 #include "itkImage.h"
 #include "itkImageFileReader.h"
 #include "itkImageFileWriter.h"
-#include "itkBinaryThresholdImageFilter.h"
 #include "itkImageRegionIteratorWithIndex.h"
-#include "itkImageDuplicator.h"
-#include "itkRegionOfInterestImageFilter.h"
-#include "itkCastImageFilter.h"
-#include "itkExtractImageFilter.h"
-#include "itkRescaleIntensityImageFilter.h"
-#include <itkSignedDanielssonDistanceMapImageFilter.h>
+#include "itkSignedDanielssonDistanceMapImageFilter.h"
+#include "itkLabelStatisticsImageFilter.h"
 
 #include <vtkSmartPointer.h>
 #include <vtkDoubleArray.h>
 #include <vtkVariantArray.h>
 #include <vtkTable.h>
 
-#include "VolumeOfInterest.h"
-
 #ifdef _OPENMP
 #include "omp.h"
 #endif
-
-typedef itk::Image< unsigned short, 3 > LabImageType;
-typedef itk::Image< unsigned short, 3 > TargImageType;
-std::vector<float> compute_ec_features( TargImageType::Pointer input_image,  LabImageType::Pointer input_labeled, int number_of_rois, unsigned short thresh, int surr_dist, int inside_dist  );
-unsigned short returnthresh( TargImageType::Pointer input_image, int num_bin_levs, int num_in_fg );
 
 namespace ftk
 { 
@@ -72,18 +59,21 @@ public:
 	void SetInputFile(std::string filename);
 	void SetInputs(ftk::Image::Pointer inp_labeled_image, int inp_channel_number, ftk::Image::Pointer seg_labeled_image, int seg_channel_number, ftk::AssociationRule *associationrule);
 	void SetFeaturePrefix(std::string prefix);			//Set Prefix for feature names
-	vtkSmartPointer<vtkTable> Compute();			//Compute and return table with values (for all objects)
-	void Update(vtkSmartPointer<vtkTable> table);		//Update the features in this table whose names match (sets doFeat)
 	void Append(vtkSmartPointer<vtkTable> table);		//Compute features that are ON and append them to the existing table
-	bool AreInputsSet(){ return inputs_set; }
 
 private:
+	template< typename InputImageType, typename LabelImageType >
+	void Compute( vtkSmartPointer<vtkTable> table,
+		typename itk::SmartPointer< InputImageType > InputITKImage,
+		typename itk::SmartPointer< LabelImageType > LabelITKImage );
 	ftk::AssociationRule *input_association;
 	std::string inFilename;
 	std::string fPrefix;
+	ftk::Image::Pointer LabelImage;
+	int LabelChannel;
+	ftk::Image::Pointer InputImage;
+	int InputChannel;
 	bool inputs_set;
-	LabImageType::Pointer lab_im;
-	TargImageType::Pointer inp_im;
 };
 
 
@@ -92,54 +82,57 @@ private:
  *  
  * \author Yousef Al-Kofahi, Rensselear Polytechnic Institute (RPI), Troy, NY USA
  */
+
+typedef itk::Image< unsigned short, 3 > LabImageType;
+typedef itk::Image< unsigned short, 3 > TargImageType;
+template < typename InputImageType = TargImageType, typename LabelImageType = LabImageType >
 class NuclearAssociationRules : public ObjectAssociation
 {
 public:
 	/* Contsructor */
-	NuclearAssociationRules(std::string segImageName, int numOfAssocRules);
-	NuclearAssociationRules(std::string AssocFName, int numOfRules, LabImageType::Pointer lImage, TargImageType::Pointer iImage);
+	NuclearAssociationRules(std::string AssocFName, int numOfRules,
+		typename itk::SmartPointer<LabelImageType> lImage,
+		typename itk::SmartPointer<InputImageType> iImage);
 	~NuclearAssociationRules();
 
 	/* This method computes all the associative measurements for all the objects */
-	void Compute(vtkSmartPointer<vtkTable> tbl = NULL);
-		
+	void Compute();
+
 	/* Get the number of objects */
-	int GetNumOfObjects() {return numOfLabels;};
+	typename LabelImageType::PixelType GetNumOfObjects() {return numLabels;};
+	std::vector< typename LabelImageType::PixelType > GetLabels(){return LabelsList;};
 private:
 	/* Private member variables */
-	typedef itk::Image< double, 3 > DistImageType;
-	typedef itk::ImageFileReader< LabImageType > ReaderType;
-	typedef itk::ImageFileWriter< LabImageType > WriterType;
-	typedef itk::BinaryThresholdImageFilter< LabImageType, LabImageType > BinaryThresholdType;
-	typedef itk::LabelGeometryImageFilter< LabImageType, LabImageType > LabelGeometryType;
-	//typedef itk::ApproximateSignedDistanceMapImageFilter<DistImageType, DistImageType > DTFilter ;
-	typedef itk::SignedDanielssonDistanceMapImageFilter<DistImageType, DistImageType > DTFilter ;
+	typedef itk::Image< double, 3 > FloatImageType;
+	typedef itk::SignedDanielssonDistanceMapImageFilter< FloatImageType, FloatImageType > DTFilter;
+	typedef		 itk::ImageRegionIteratorWithIndex< FloatImageType > IteratorTypeFloat;
+	typedef typename itk::ImageRegionIteratorWithIndex< LabelImageType > IteratorTypeLabel;
+	typedef typename itk::ImageRegionIteratorWithIndex< InputImageType > IteratorTypeInput;
+	typedef typename itk::LabelStatisticsImageFilter< InputImageType, LabelImageType > LabelStatisticsImageFilterType;
+	typedef typename LabelStatisticsImageFilterType::ValidLabelValuesContainerType
+									ValidLabelValuesType;
 
-	LabImageType::Pointer labImage;
-	TargImageType::Pointer inpImage;
-	LabelGeometryType::Pointer labGeometryFilter;	
-	int x_Size;
-	int y_Size;
-	int z_Size;
-	int imDim;
-	bool inputs_set;
+	typename itk::SmartPointer<LabelImageType> labImage;
+	typename itk::SmartPointer<InputImageType> inpImage;
+	itk::SizeValueType x_Size;
+	itk::SizeValueType y_Size;
+	itk::SizeValueType z_Size;
+	itk::SizeValueType imDim;
+	std::vector< typename LabelImageType::PixelType > LabelsList;
+	typename LabelImageType::PixelType numLabels;
 
-	unsigned short thresh;
-
+	typename InputImageType::PixelType thresh;
+	typename LabelStatisticsImageFilterType::Pointer LabelStatisticsImageFilter;
 
 private:
 	/* This method is used to compute a single associative measurement for one cell */
-	float ComputeOneAssocMeasurement(itk::SmartPointer<TargImageType> trgIm, int ruleID, int objID);
-
-	/* the next functions will compute the measurements for the different cases */
-	float FindMin(std::vector<int> LST);
-	float FindMax(std::vector<int> LST);
-	float ComputeTotal(std::vector<int> LST);
-	float ComputeAverage(std::vector<int> LST);
+	float ComputeOneAssocMeasurement(int ruleID, typename LabelImageType::PixelType objID);
 
 	int num_rois;
-	
 }; // end NuclearAssociation
 }  // end namespace ftk
+
+#include "AssociationAuxFns.txx"
+#include "ftkNuclearAssociationRules.txx"
 
 #endif	// end __ftkNuclearAssociationRules_h
