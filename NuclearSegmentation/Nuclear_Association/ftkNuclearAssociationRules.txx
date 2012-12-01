@@ -46,6 +46,7 @@ template< typename InputImageType, typename LabelImageType >
 	assoc->PrintSelf();
 	assoc->Compute();
 
+	std::cout<<"Adding blank columns to table\n"<<std::flush;
 	//Init the table (headers):
 	for (int i=0; i < assoc->GetNumofAssocRules(); ++i)
 	{
@@ -55,32 +56,39 @@ template< typename InputImageType, typename LabelImageType >
 		table->AddColumn(column);
 	}
 
+	std::cout<<"Updating columns in table\n"<<std::flush;
 	//Now update the table:
+	std::vector< std::pair< typename LabelImageType::PixelType, typename LabelImageType::PixelType> > IdListPair;
+	for(typename LabelImageType::PixelType r=0; r<table->GetNumberOfRows(); ++r)
+	{
+		std::pair< typename LabelImageType::PixelType, typename LabelImageType::PixelType>
+			currentPair(	(typename LabelImageType::PixelType)r,
+					(typename LabelImageType::PixelType)(table->GetValue(r,0).ToUnsignedInt() ) );
+		IdListPair.push_back( currentPair );
+	}
+	std::sort(IdListPair.begin(), IdListPair.end(), 
+			boost::bind(&std::pair<typename LabelImageType::PixelType, typename LabelImageType::PixelType>::second, _1) < 
+			boost::bind(&std::pair<typename LabelImageType::PixelType, typename LabelImageType::PixelType>::second, _2) );
+
 	typename std::vector<typename LabelImageType::PixelType > labels = assoc->GetLabels();
 	float** vals = assoc->GetAssocFeaturesList();
-	//#pragma omp parallel for num_threads(4)
-	for (long i=0; i<labels.size(); ++i)
+	for(typename LabelImageType::PixelType i=0; i<labels.size(); ++i)
 	{
 		typename LabelImageType::PixelType id = labels.at(i);
 		if(id == 0) continue;
 
-		long row = -1;
-		for(typename LabelImageType::PixelType r=0; r<table->GetNumberOfRows(); ++r)
+		if( id!=IdListPair.at(i).second )
 		{
-			if( table->GetValue(r,0) == id )
-			{
-				row = r;
-				break;
-			}
+			std::cout<<"Labels in the table and image do not match. Aborting. Association\n"<<std::flush;
+			for (int f=0; f<assoc->GetNumofAssocRules(); ++f)
+				table->RemoveColumnByName( (fPrefix+assoc->GetAssociationRules().at(f).GetRuleName()).c_str() );
+			break;
 		}
-
-		if(row == -1) continue;
-
 		for (int f=0; f<assoc->GetNumofAssocRules(); ++f)
-		{
-			table->SetValueByName(row,(fPrefix+assoc->GetAssociationRules().at(f).GetRuleName()).c_str(), vtkVariant(vals[f][i]));
-		}
+			table->SetValueByName(IdListPair.at(i).first,
+					(fPrefix+assoc->GetAssociationRules().at(f).GetRuleName()).c_str(), vtkVariant(vals[f][i]));
 	}
+	std::cout<<"Done with current set of associations\n"<<std::flush;
 	delete assoc;
 	return;
 }
@@ -139,6 +147,7 @@ void NuclearAssociationRules< InputImageType, LabelImageType >::Compute()
 	}
 
 	numLabels = (typename LabelImageType::PixelType)LabelsList.size();
+	std::sort( LabelsList.begin(), LabelsList.end() );
 
 	//allocate memory for the features list
 	assocMeasurementsList = new float*[GetNumofAssocRules()];
@@ -149,7 +158,8 @@ void NuclearAssociationRules< InputImageType, LabelImageType >::Compute()
 		assocMeasurementsList[i] = new float[numLabels];
 		//read the ith target image (the image from which we need to compute the ith assoc. rule
 
-		if( assocRulesList[i].IsUseBackgroundSubtraction() ){
+		if( assocRulesList[i].IsUseBackgroundSubtraction() )
+		{
 			if( assocRulesList[i].IsUseMultiLevelThresholding() )
 				if( assocRulesList[i].GetNumberOfThresholds() >= 
 				    assocRulesList[i].GetNumberIncludedInForeground() )
@@ -196,28 +206,33 @@ void NuclearAssociationRules< InputImageType, LabelImageType >::Compute()
 								inside_distance );
 			for(typename LabelImageType::PixelType j=0; j<numLabels; ++j)
 				assocMeasurementsList[i][j] = ec_feat_vals[j];
-		} else {
+		}
+		else
+		{
 			typename LabelImageType::PixelType counterLabels = 0;
 #ifdef _OPENMP
-#ifndef _MSC_VER
 			int n_thr = 0.95*omp_get_max_threads();
 			std::cout<<"Number of threads "<<n_thr<<std::endl;
 			itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
 			#pragma omp parallel for num_threads(n_thr) 
+#if _OPENMP >= 200805L
+			for( typename LabelImageType::PixelType j=0; j<numLabels; ++j )
+#else
+			for( itk::IndexValueType j=0; j<numLabels; ++j )
 #endif
+#else
+			for( typename LabelImageType::PixelType j=0; j<numLabels; ++j )	
 #endif
-			for( typename LabelImageType::PixelType j=0; j<numLabels; ++j ) {
+			{
 				typename LabelImageType::PixelType lbl = LabelsList[j];
 				if(lbl == 0) continue;
 				assocMeasurementsList[i][j] = ComputeOneAssocMeasurement(i, lbl);
 			}
 #ifdef _OPENMP
-#ifndef _MSC_VER
 			itk::MultiThreader::SetGlobalMaximumNumberOfThreads(n_thr);
 #endif
-#endif
 		}
-		std::cout<<"\tdone"<<std::endl;
+		std::cout<<"done with current feature"<<std::endl;
 	}
 }
 

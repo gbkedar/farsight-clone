@@ -44,6 +44,9 @@
 #include <vtkVariantArray.h>
 #include <vtkTable.h>
 
+#include <boost/config.hpp>
+#include <boost/bind.hpp>
+
 #ifdef _OPENMP
 #include "omp.h"
 #endif
