@@ -214,6 +214,7 @@ bool Image::LoadStandardImage( std::string fileName, bool stacksAreForTime, bool
 {
 	// Find out the pixel type of the image in file
 	itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO( fileName.c_str(), itk::ImageIOFactory::ReadMode );
+	std::cout<<"Reading file: "<<fileName<<std::endl<<std::flush;
 	if( !imageIO )
 	{
 		std::cerr << "NO IMAGEIO WAS FOUND" << std::endl;
@@ -242,7 +243,7 @@ bool Image::LoadStandardImage( std::string fileName, bool stacksAreForTime, bool
 	{
 		itk::ExceptionObject excp;
 		excp.SetDescription("TOO MANY COMPONENTS");
-		throw excp;
+	throw excp;
 		return false;
 	}
 

@@ -1,15 +1,9 @@
 OPTION( BUILD_PROJPROC_WITH_MONT_SEG "Build Project Processor With Montage Segmentation" OFF )
 IF( BUILD_PROJPROC_WITH_MONT_SEG )
-  set(Boost_USE_STATIC_LIBS ON)
-  set(Boost_USE_MULTITHREADED ON)
-  set(Boost_USE_STATIC_RUNTIME OFF)
-  find_package(Boost COMPONENTS filesystem system)
-  add_definitions( -DPROJPROC_WITH_MONT_SEG )
-  message( "Using boost libraries: ${Boost_LIBRARIES}" )
   IF( NOT Boost_LIBRARY_DIRS )
-    message( "Compiled Boost libs not found. Forcing BUILD_PROJPROC_WITH_MONTSEG Off" )
-    set( BUILD_PROJPROC_WITH_MONT_SEG OFF CACHE BOOL 
-	    	"Build Project Processor With Montage Segmentation" FORCE )
+    message( "Compiled Boost libs not found. Perhaps you should turn BUILD_PROJPROC_WITH_MONTSEG Off" )
+  ELSE()
+    add_definitions( -DPROJPROC_WITH_MONT_SEG )
   ENDIF()
 ENDIF( BUILD_PROJPROC_WITH_MONT_SEG )
 
