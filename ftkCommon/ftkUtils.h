@@ -78,10 +78,9 @@ bool SaveTableSeriesActive(std::string filename,std::vector< vtkSmartPointer<vtk
 double GetMean(std::vector<double> data);
 double GetStd(std::vector<double> data);
 
-//std::vector<ftk::AssociationRule> ReadAssociationRules(TiXmlElement * inputElement);
-
 typedef struct { std::string regionChannelName; std::string targetChannelName; int mode;
 				 std::string outputFilename; int radius; int erodeRadius; } PixelAnalysisDefinitions;
+
 }  // end namespace ftk
 
 #endif	// end __ftkUtils_h

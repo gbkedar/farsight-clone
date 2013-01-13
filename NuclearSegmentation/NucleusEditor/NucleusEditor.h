@@ -144,8 +144,6 @@ protected slots:
 	void update5DTable(void);
 
 	void updateMultiLabels(void);
-	
-
 
 	void askLoadResult(void);
 	void loadResult(QString fileName);

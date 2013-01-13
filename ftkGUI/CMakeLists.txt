@@ -19,6 +19,7 @@ SET( GUI_SRCS
 	SelectiveClustering.cpp
 	QvtkTableView.cpp
 )
+
 SET( NONQT_GUI_SRCS
 	ProcessObjectProgressUpdater.cpp
 	SelectionUtilities.cpp
@@ -45,6 +46,12 @@ SET( GUI_HDRS
 	SelectiveClustering.h
 	QvtkTableView.h
 )
+
+IF( BUILD_PROJPROC_WITH_MONT_SEG )
+  SET( ${GUI_SRCS} MontageView.cpp )
+  SET( ${GUI_HDRS} MontageView.h )
+ENDIF()
+
 SET( NONQT_GUI_HDRS
 	ProcessObjectProgressUpdater.h
 	SelectionUtilities.h
@@ -52,7 +59,7 @@ SET( NONQT_GUI_HDRS
 
 SET( GUI_LIBS
   ${QT_LIBRARIES} QVTK ftkCommon ftkPreprocess ftkImage TinyXML libSVM
-  vtkVolumeRendering vtkHybrid vtkCharts vnl)
+  ${ITK_LIBRARIES} ${VTK_LIBRARIES} )
 
 IF(QtTestingFound)
   CONFIGURE_FILE(
