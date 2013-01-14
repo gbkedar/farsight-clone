@@ -1,6 +1,27 @@
+#include "MontageView.h"
+
 MontageView::MontageView( QWidget * parent )
 {
-  createMenus();
+  setWindowTitle(tr("Montage View"));
+  standardImageTypes = tr("XML Image Definition (*.xml)\n"
+  			  "All Files (*.*)");
+  Image = NULL;
+  SubsampledImage = NULL;
+  LabelImage = NULL;
+  this->createMenus();
+  this->readSettings();
+}
+
+void MontageView::readSettings()
+{
+  QSettings settings;
+  lastPath = settings.value("lastPath", ".").toString();
+}
+
+void MontageView::writeSettings()
+{
+  QSettings settings;
+  settings.setValue("lastPath", lastPath);
 }
 
 void MontageView::createMenus()
@@ -72,3 +93,29 @@ void MontageView::DisplayChannelsMenu()
   }
   connect(chSignalMapper, SIGNAL(mapped(int)), this, SLOT(toggleChannel(int)));
 }
+
+void MontageView::askLoadImage()
+{
+  QString fileName = QFileDialog::getOpenFileName(this, "Open Image", lastPath, standardImageTypes);
+  if(fileName == "")
+    return; //No file returned
+  this->loadImage(fileName);
+}
+
+void MontageView::loadImage( QString fileName )
+{
+  lastPath = QFileInfo(fileName).absolutePath() + QDir::separator();
+  QString name = QFileInfo(fileName).fileName();
+  QString myExt = QFileInfo(fileName).suffix();
+  if(myExt == "xml")
+    Image = ftk::LoadXMLImage(fileName.toStdString());
+  else
+  {
+    std::cerr<<"Can only load xml image files\n";
+    return;
+  }
+  
+
+
+}
+

@@ -41,6 +41,7 @@ private:
 signals:
 protected:
   void createMenus();
+  void readSettings();
   QMenu *fileMenu;
   QAction *loadProjectAction;
   QAction *loadImageAction;
@@ -50,6 +51,8 @@ protected:
   QMenu *displayChannelMenu;
   QSignalMapper *chSignalMapper;
   QVector<QAction *> displayChannelAction;
+  QString standardImageTypes;
 
+  QString lastPath;
 }
 #endif //MONTAGE_VIEW_H
