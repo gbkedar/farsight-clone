@@ -209,9 +209,6 @@ protected:
 	void setupUI(void);
 	void zoom(double zf);
 
-	void createChannelWidget(void);
-	void removeChannelWidget(void);
-
 	void scaleIntensity(QImage *img, int threshold, int offset);
 
 	float Distance(int x1, int y1, int x2, int y2);

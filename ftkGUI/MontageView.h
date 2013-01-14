@@ -52,6 +52,4 @@ protected:
   QVector<QAction *> displayChannelAction;
 
 }
-
-
 #endif //MONTAGE_VIEW_H

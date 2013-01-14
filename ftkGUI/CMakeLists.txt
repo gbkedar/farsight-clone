@@ -48,8 +48,8 @@ SET( GUI_HDRS
 )
 
 IF( BUILD_PROJPROC_WITH_MONT_SEG )
-  SET( ${GUI_SRCS} MontageView.cpp )
-  SET( ${GUI_HDRS} MontageView.h )
+  SET( ${GUI_SRCS} MontageView.cpp MontageDiplayArea.h )
+  SET( ${GUI_HDRS} MontageView.h   MontageDiplayArea.cpp )
 ENDIF()
 
 SET( NONQT_GUI_HDRS
