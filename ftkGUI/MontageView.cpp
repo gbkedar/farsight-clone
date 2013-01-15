@@ -114,8 +114,108 @@ void MontageView::loadImage( QString fileName )
     std::cerr<<"Can only load xml image files\n";
     return;
   }
-  
-
-
+  //Clear image in nucleus editor *****
+  //Clear label and table *****
+  resetSubsampledImageAndDisplayImage();
 }
 
+void MontageView::resetSubsampledImageAndDisplayImage()
+{
+  typedef itk::Image< unsigned char, 3 > Uchar3DImageType;
+  typedef itk::Image< float, 3 > Float3DImageType;
+  typedef itk::MaximumProjectionImageFilter< Uchar3DImageType, Uchar3DImageType > MaxProjectType;
+  typedef itk::CastImageFilter< InputImageType, Float3DImageType > CastFilterType;
+  typedef itk::RecursiveGaussianImageFilter< Float3DImageType, Float3DImageType > GaussianFilterType;
+  typedef itk::ResampleImageFilter< Float3DImageType, Uchar3DImageType > ResampleFilterType;
+  typedef itk::IdentityTransform< double, 3 >  TransformType;
+  typedef itk::LinearInterpolateImageFunction< Float3DImageType, double > InterpolatorType;
+
+  if( SubsampledImage )
+    delete SubsampledImage;
+
+  ftk::Image::Pointer SubsampledImage = ftk::Image::New();
+  const ftk::Image::Info * imInfo = Image->GetImageInfo();
+  if( imInfo->numColumns<1000 && imInfo->numRows<1000 )
+    SubsampledImage = Image; //Just in case...
+  else
+  {
+  //Take the maximum intensity projection and subsample each channel
+   for( unsigned i=0; i<imInfo->channelNames.size(); ++i )
+   {
+    Uchar3DImageType::Pointer currentChannel = Image->GetItkPtr<unsigned char>(0,0,ftk::Image::DEEP_COPY);
+    Uchar3DImageType::Pointer currentChannelProjection;
+    //Get projection if the image is 3D
+    if( imInfo->numZSlices > 1 )
+    {
+      MaxProjectType::Pointer MaxProjectFilter = MaxProjectType::New();
+      MaxProjectFilter->SetInput( currentChannel );
+      MaxProjectFilter->SetProjectDimension( 3 );
+      try
+      {
+	MaxProjectFilter->Update();
+      }
+      catch( itk::ExceptionObject & excp )
+      {
+	std::cerr << "Error in projection for subsampling:"
+		  << excp << std::endl;
+      }
+      currentChannelProjection = MaxProjectFilter->GetOutput();
+    }
+    else
+    {
+      currentChannelProjection = currentChannel;
+    }
+
+    double scaleFactor = imInfo->numColumns > imInfo->numRows ? numColumns : numRows ;
+    scaleFactor = scaleFactor/1000.0;
+    const Uchar3DImageType::SpacingType& inputSpacing = Image->GetSpacing();
+    //Subsample the image setting the maximum x-y dimension to 1000pixels
+    //Cast, smooth(for aliasing), then resample
+    CastFilterType::Pointer caster = CastFilterType::New();
+    caster->SetInput( currentChannelProjection );
+
+    GaussianFilterType::Pointer smoother = GaussianFilterType::New();
+    smoother->SetInput( caster->GetOutput() );
+    smoother->SetSigma( inputSpacing[0]*scaleFactor );
+
+    ResampleFilterType::Pointer resampler = ResampleFilterType::New();
+
+    TransformType::Pointer transform = TransformType::New();
+    transform->SetIdentity();
+    resampler->SetTransform( transform );
+
+    InterpolatorType::Pointer interpolator = InterpolatorType::New();
+    resampler->SetInterpolator( interpolator );
+
+    resampler->SetDefaultPixelValue( 0 );
+
+    OutputImageType::SpacingType spacing;
+    spacing[0] = inputSpacing[0] * scaleFactor;
+    spacing[1] = inputSpacing[1] * scaleFactor;
+    spacing[2] = inputSpacing[2];
+
+    resampler->SetOutputSpacing( spacing );
+    resampler->SetOutputOrigin( Image->GetOrigin() );
+    resampler->SetOutputDirection( Image->GetDirection() );
+
+    Uchar3DImageType::SizeType size;
+    size[0] = ((double)imInfo->numColumns)/scaleFactor;
+    size[1] = ((double)imInfo->numRows)/scaleFactor;
+    size[2] = numZSlices;
+    resampler->SetSize( size );
+
+    resampler->SetInput( smoother->GetOutput() );
+    try
+    {
+      resampler->Update();
+    }
+    catch( itk::ExceptionObject & excep )
+    {
+      std::cerr << "Exception in subsampling:\n"
+		<< excp << std::endl;
+    }
+    SubsampledImage->AppendChannelFromData3D( );
+   }
+
+  }
+}

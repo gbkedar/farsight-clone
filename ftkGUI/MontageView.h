@@ -29,7 +29,7 @@ protected slots:
   void DisplayChannelsMenu(void);
   void toggleChannel(int chNum);
   void loadImage(QString fileName);
-
+  void resetSubsampledImageAndDisplayImage(void);
 
 private:
   QVTKWidget MainQTWidget;
