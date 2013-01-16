@@ -1,6 +1,6 @@
 #include "MontageDiplayArea.h"
 
-MontageDiplayArea::MontageDiplayArea(QMap<QString, QColor> * new_colorItemsMap, QWidget *parent)
+MontageDiplayArea::MontageDiplayArea(QWidget *parent)
   : QWidget(parent)
 {
   channelImg = NULL;
@@ -108,6 +108,17 @@ void MontageDiplayArea::SetChannelImage(ftk::Image::Pointer img)
     refreshBaseImage();
     return;
   }
+  channelImg = img;
+  initChannelFlags();
+  refreshBaseImage();
+}
+
+void MontageDiplayArea::initChannelFlags()
+{
+  channelFlags.clear();
+  std::vector<std::string> channel_names = channelImg->GetChannelNames();
+  for (unsigned ch=0; ch<channel_names.size(); ++ch)
+    channelFlags.push_back(true);
 }
 
 void MontageDiplayArea::refreshBaseImage()
@@ -163,4 +174,8 @@ void MontageDiplayArea::mouseReleaseEvent(QMouseEvent *event)
   }
 }
 
-
+void MontageDiplayArea::SetChannelFlags( std::vector<bool> chFlags )
+{
+  channelFlags = ch_fg;
+  refreshBaseImage();
+}

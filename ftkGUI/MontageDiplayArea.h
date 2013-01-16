@@ -25,10 +25,12 @@ class MontageDiplayArea  : public QWidget
   Q_OBJECT
 
 public:
-  MontageDiplayArea (QMap<QString, QColor> * new_colorItemsMap = NULL, QWidget *parent = 0);
+  MontageDiplayArea (QWidget *parent = 0);
   ~MontageDiplayArea();
 
   void SetChannelImage(ftk::Image::Pointer img);
+  std::vector<bool> GetChannelFlags(void){ return channelFlags; };
+  void SetChannelFlags(std::vector<bool> chFlags);
 
 public slots:
 
@@ -67,6 +69,6 @@ protected:
   //For Getting a Box:
   QPoint origin;
   MyRubberBand *rubberBand;
-}
+};
 
 #endif //MONTAGE_DISPLAY_H

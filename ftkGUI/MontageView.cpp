@@ -8,6 +8,11 @@ MontageView::MontageView( QWidget * parent )
   Image = NULL;
   SubsampledImage = NULL;
   LabelImage = NULL;
+
+  chSignalMapper = NULL;
+
+  imageViewer = new MontageDiplayArea();
+
   this->createMenus();
   this->readSettings();
 }
@@ -142,7 +147,7 @@ void MontageView::resetSubsampledImageAndDisplayImage()
   //Take the maximum intensity projection and subsample each channel
    for( unsigned i=0; i<imInfo->channelNames.size(); ++i )
    {
-    Uchar3DImageType::Pointer currentChannel = Image->GetItkPtr<unsigned char>(0,0,ftk::Image::DEEP_COPY);
+    Uchar3DImageType::Pointer currentChannel = Image->GetItkPtr<unsigned char>( 0, i, ftk::Image::DEEP_COPY);
     Uchar3DImageType::Pointer currentChannelProjection;
     //Get projection if the image is 3D
     if( imInfo->numZSlices > 1 )
@@ -156,7 +161,7 @@ void MontageView::resetSubsampledImageAndDisplayImage()
       }
       catch( itk::ExceptionObject & excp )
       {
-	std::cerr << "Error in projection for subsampling:"
+	std::cerr << "Exception in projection for subsampling:"
 		  << excp << std::endl;
       }
       currentChannelProjection = MaxProjectFilter->GetOutput();
@@ -214,8 +219,10 @@ void MontageView::resetSubsampledImageAndDisplayImage()
       std::cerr << "Exception in subsampling:\n"
 		<< excp << std::endl;
     }
-    SubsampledImage->AppendChannelFromData3D( );
+    SubsampledImage->AppendChannelFromData3D( (void *)resampler->GetOutput()->GetBufferPointer(),
+	itk::ImageIOBase::UCHAR, sizeof(Uchar3DImageType::PixelType), size[2], size[1], size[0],
+	imInfo->channelNames.at(i), imInfo->channelColors.at(i), true );
    }
-
   }
+  SetChannelImage( SubsampledImage )
 }

@@ -11,6 +11,8 @@
 #include <QApplication>
 #include <QFileDialog>
 
+#include "MontageDiplayArea.h"
+
 class MontageView : public QMainWindow
 {
   Q_OBJECT;
@@ -19,7 +21,7 @@ public:
   ~MontageView();
   void Initialize();
 
-private:
+//private:
 
 protected:
   virtual void closeEvent(QCloseEvent *event);
@@ -30,6 +32,7 @@ protected slots:
   void toggleChannel(int chNum);
   void loadImage(QString fileName);
   void resetSubsampledImageAndDisplayImage(void);
+  MontageDiplayArea *imageViewer;
 
 private:
   QVTKWidget MainQTWidget;
@@ -54,5 +57,5 @@ protected:
   QString standardImageTypes;
 
   QString lastPath;
-}
+};
 #endif //MONTAGE_VIEW_H

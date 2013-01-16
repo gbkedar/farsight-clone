@@ -108,6 +108,8 @@
 #include "itkImageRegionConstIterator.h"
 #include "itkImageFileReader.h"
 
+#include "ftkGUI/MontageView.h"
+
 class ParamsFileDialog;
 class ProcessThread;
 
