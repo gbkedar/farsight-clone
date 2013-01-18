@@ -13,6 +13,7 @@
 #include <QFileDialog>
 
 #include "itkMaximumProjectionImageFilter.h"
+#include "itkRescaleIntensityImageFilter.h"
 #include "itkAdaptiveHistogramEqualizationImageFilter.h"
 #include "itkCastImageFilter.h"
 #include "itkRecursiveGaussianImageFilter.h"

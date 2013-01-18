@@ -147,6 +147,7 @@ void MontageView::resetSubsampledImageAndDisplayImage()
   typedef itk::Image< float, 3 > Float3DImageType;
   typedef itk::MaximumProjectionImageFilter< Uchar3DImageType, Uchar3DImageType > MaxProjectType;
   typedef itk::AdaptiveHistogramEqualizationImageFilter< Uchar3DImageType > AdaptiveHistEqType;
+  typedef itk::RescaleIntensityImageFilter< Uchar3DImageType >  RescaleIntensityType;
   typedef itk::CastImageFilter< Uchar3DImageType, Float3DImageType > CastFilterType;
   typedef itk::RecursiveGaussianImageFilter< Float3DImageType, Float3DImageType > GaussianFilterType;
   typedef itk::ResampleImageFilter< Float3DImageType, Uchar3DImageType > ResampleFilterType;
@@ -198,7 +199,7 @@ void MontageView::resetSubsampledImageAndDisplayImage()
 
     GaussianFilterType::Pointer smoother = GaussianFilterType::New();
     smoother->SetInput( caster->GetOutput() );
-    smoother->SetSigma( inputSpacing[0]*scaleFactor );
+    smoother->SetSigma( inputSpacing[0]*(scaleFactor/2) );
     smoother->SetNormalizeAcrossScale( true );
 
     ResampleFilterType::Pointer resampler = ResampleFilterType::New();
@@ -236,19 +237,22 @@ void MontageView::resetSubsampledImageAndDisplayImage()
     histeq->SetBeta ( 1 );
     histeq->SetRadius( 100 );
 */
+    RescaleIntensityType::Pointer rescale = RescaleIntensityType::New();
+    rescale->SetInput( resampler->GetOutput() );
+    rescale->SetOutputMaximum( itk::NumericTraits<Uchar3DImageType::PixelType>::max() );
+    rescale->SetOutputMinimum( itk::NumericTraits<Uchar3DImageType::PixelType>::min() );
 
     std::string opstring = ftk::GetFilePath( filenames.at(i) )+ "/" + imInfo->channelNames.at(i) + ".tif";
     typedef itk::ImageFileWriter< Uchar3DImageType > ImageFileWriterType;
     ImageFileWriterType::Pointer writer = ImageFileWriterType::New();
     writer->SetFileName( opstring.c_str() );
-    writer->SetInput( resampler->GetOutput() );
+    writer->SetInput( rescale->GetOutput() );
     std::cout<<"Writing downsampled image:"<<opstring<<std::endl;
 
     try
     {
       std::cout<<"Resampling Channel "<< imInfo->channelNames.at(i) << std::endl;
-      resampler->Update();
-      //histeq->Update();
+      //rescale->Update();
       writer->Update();
     }
     catch( itk::ExceptionObject & excep )
