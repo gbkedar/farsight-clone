@@ -459,18 +459,18 @@ void NucleusEditor::createMenus()
 	connect(newRenderAction,SIGNAL(triggered()),this,SLOT(CreateNewRenderWindow()));
 	viewMenu->addAction(newRenderAction);
 
+	imageIntensityAction = new QAction(tr("Adjust Image Intensity"), this);
+	imageIntensityAction->setObjectName("imageIntensityAction");
+	imageIntensityAction->setStatusTip(tr("Allows modification of image intensity"));
+	connect(imageIntensityAction, SIGNAL(triggered()), segView, SLOT(AdjustImageIntensity()));
+	viewMenu->addAction(imageIntensityAction);
+
 #ifdef PROJPROC_WITH_MONT_SEG
 	montageViewAction = new QAction(tr("Launch Montage View"),this);
 	montageViewAction->setObjectName("montageViewAction");
 	connect(montageViewAction, SIGNAL(triggered()), this, SLOT(launchMontageView()) );
 	viewMenu->addAction(montageViewAction);
 #endif
-
-	imageIntensityAction = new QAction(tr("Adjust Image Intensity"), this);
-	imageIntensityAction->setObjectName("imageIntensityAction");
-	imageIntensityAction->setStatusTip(tr("Allows modification of image intensity"));
-	connect(imageIntensityAction, SIGNAL(triggered()), segView, SLOT(AdjustImageIntensity()));
-	viewMenu->addAction(imageIntensityAction);
 
 	//TOOL MENU
 	toolMenu = menuBar()->addMenu(tr("Tools"));
@@ -3056,6 +3056,7 @@ void NucleusEditor::launchMontageView()
 	segView->SetLabelImage(myImg);
 	this->closeViews();
 	montageView = new MontageView(this);
+	montageView->show();
 }
 #endif
 //**********************************************************************

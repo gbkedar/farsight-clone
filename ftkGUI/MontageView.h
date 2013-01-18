@@ -13,11 +13,16 @@
 #include <QFileDialog>
 
 #include "itkMaximumProjectionImageFilter.h"
+#include "itkAdaptiveHistogramEqualizationImageFilter.h"
 #include "itkCastImageFilter.h"
 #include "itkRecursiveGaussianImageFilter.h"
 #include "itkResampleImageFilter.h"
 
 #include "MontageDiplayArea.h"
+
+//Testing
+#include "ftkCommon/ftkUtils.h"
+#include "itkImageFileWriter.h"
 
 class MontageView : public QMainWindow
 {

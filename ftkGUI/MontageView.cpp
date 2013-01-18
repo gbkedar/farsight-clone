@@ -17,6 +17,16 @@ MontageView::MontageView( QWidget * parent )
   this->readSettings();
 }
 
+MontageView::~MontageView()
+{
+
+}
+
+void MontageView::closeEvent(QCloseEvent *event)
+{
+	//Delete pointer from Nucleus Editor *****
+}
+
 void MontageView::readSettings()
 {
   QSettings settings;
@@ -128,11 +138,15 @@ void MontageView::loadProject()
 {
 }
 
+//Take the maximum intensity projection and subsample each channel
+//Subsample the image setting the maximum x-y dimension to 1000pixels
+//Redo the contrast, cast, smooth(for aliasing), then resample
 void MontageView::resetSubsampledImageAndDisplayImage()
 {
   typedef itk::Image< unsigned char, 3 > Uchar3DImageType;
   typedef itk::Image< float, 3 > Float3DImageType;
   typedef itk::MaximumProjectionImageFilter< Uchar3DImageType, Uchar3DImageType > MaxProjectType;
+  typedef itk::AdaptiveHistogramEqualizationImageFilter< Uchar3DImageType > AdaptiveHistEqType;
   typedef itk::CastImageFilter< Uchar3DImageType, Float3DImageType > CastFilterType;
   typedef itk::RecursiveGaussianImageFilter< Float3DImageType, Float3DImageType > GaussianFilterType;
   typedef itk::ResampleImageFilter< Float3DImageType, Uchar3DImageType > ResampleFilterType;
@@ -144,11 +158,11 @@ void MontageView::resetSubsampledImageAndDisplayImage()
 
   ftk::Image::Pointer SubsampledImage = ftk::Image::New();
   const ftk::Image::Info * imInfo = Image->GetImageInfo();
+  std::vector< std::string > filenames = Image->GetFilenames();
   if( imInfo->numColumns<1000 && imInfo->numRows<1000 )
     SubsampledImage = Image; //Just in case...
   else
   {
-  //Take the maximum intensity projection and subsample each channel
    for( unsigned i=0; i<imInfo->channelNames.size(); ++i )
    {
     Uchar3DImageType::Pointer currentChannel = Image->GetItkPtr<unsigned char>( 0, i, ftk::Image::DEEP_COPY);
@@ -178,14 +192,14 @@ void MontageView::resetSubsampledImageAndDisplayImage()
     double scaleFactor = imInfo->numColumns > imInfo->numRows ? imInfo->numColumns : imInfo->numRows ;
     scaleFactor = scaleFactor/1000.0;
     const Uchar3DImageType::SpacingType& inputSpacing = currentChannelProjection->GetSpacing();
-    //Subsample the image setting the maximum x-y dimension to 1000pixels
-    //Cast, smooth(for aliasing), then resample
+
     CastFilterType::Pointer caster = CastFilterType::New();
     caster->SetInput( currentChannelProjection );
 
     GaussianFilterType::Pointer smoother = GaussianFilterType::New();
     smoother->SetInput( caster->GetOutput() );
     smoother->SetSigma( inputSpacing[0]*scaleFactor );
+    smoother->SetNormalizeAcrossScale( true );
 
     ResampleFilterType::Pointer resampler = ResampleFilterType::New();
 
@@ -214,9 +228,28 @@ void MontageView::resetSubsampledImageAndDisplayImage()
     resampler->SetSize( size );
 
     resampler->SetInput( smoother->GetOutput() );
+
+/*  //Good idea to use but needs to be multithreaded.. Too slow..
+    AdaptiveHistEqType::Pointer histeq = AdaptiveHistEqType::New();
+    histeq->SetInput( resampler->GetOutput() );
+    histeq->SetAlpha( 1 );
+    histeq->SetBeta ( 1 );
+    histeq->SetRadius( 100 );
+*/
+
+    std::string opstring = ftk::GetFilePath( filenames.at(i) )+ "/" + imInfo->channelNames.at(i) + ".tif";
+    typedef itk::ImageFileWriter< Uchar3DImageType > ImageFileWriterType;
+    ImageFileWriterType::Pointer writer = ImageFileWriterType::New();
+    writer->SetFileName( opstring.c_str() );
+    writer->SetInput( resampler->GetOutput() );
+    std::cout<<"Writing downsampled image:"<<opstring<<std::endl;
+
     try
     {
+      std::cout<<"Resampling Channel "<< imInfo->channelNames.at(i) << std::endl;
       resampler->Update();
+      //histeq->Update();
+      writer->Update();
     }
     catch( itk::ExceptionObject & excep )
     {

@@ -40,8 +40,8 @@ signals:
 
 protected slots:
   void refreshBaseImage(void);
-  void updateVSlider(void);
-  void updateHSlider(void);
+/*  void updateVSlider(void);
+  void updateHSlider(void); */
   void initChannelFlags(void);
 
 protected:

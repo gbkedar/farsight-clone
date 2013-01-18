@@ -16,6 +16,11 @@ MontageDiplayArea::MontageDiplayArea(QWidget *parent)
 }
 
 
+MontageDiplayArea::~MontageDiplayArea()
+{
+
+}
+
 void MontageDiplayArea::setupUI(void)
 {
 
@@ -63,8 +68,6 @@ void MontageDiplayArea::setupUI(void)
   allLayout->addLayout(viewerLayout,1,0);
 
   setLayout(allLayout);
-  connect(vSlider, SIGNAL(valueChanged(int)), this, SLOT(sliderChange(int)));
-  connect(hSlider, SIGNAL(valueChanged(int)), this, SLOT(sliderChange(int)));
 
   setAttribute ( Qt::WA_DeleteOnClose );
   setWindowTitle(tr("Downsampled Montage Viewer"));
@@ -155,6 +158,12 @@ void MontageDiplayArea::refreshBaseImage()
   }
   this->repaint();
 }
+
+void MontageDiplayArea::moveEvent ( QMoveEvent * event )
+{
+	QWidget::moveEvent ( event );
+}
+
 
 void MontageDiplayArea::mouseReleaseEvent(QMouseEvent *event)
 {
