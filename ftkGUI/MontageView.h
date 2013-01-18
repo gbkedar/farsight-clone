@@ -8,8 +8,14 @@
 #include <QtGui/QMenu>
 #include <QtGui/QAction>
 #include <QtGui/QWidget>
+#include <QtCore/QSignalMapper>
 #include <QApplication>
 #include <QFileDialog>
+
+#include "itkMaximumProjectionImageFilter.h"
+#include "itkCastImageFilter.h"
+#include "itkRecursiveGaussianImageFilter.h"
+#include "itkResampleImageFilter.h"
 
 #include "MontageDiplayArea.h"
 
@@ -25,6 +31,8 @@ public:
 
 protected:
   virtual void closeEvent(QCloseEvent *event);
+  MontageDiplayArea *imageViewer;
+
 protected slots:
   void loadProject(void);
   void askLoadImage(void);
@@ -32,10 +40,9 @@ protected slots:
   void toggleChannel(int chNum);
   void loadImage(QString fileName);
   void resetSubsampledImageAndDisplayImage(void);
-  MontageDiplayArea *imageViewer;
+  void SetChannelImage(void);
 
 private:
-  QVTKWidget MainQTWidget;
   ftk::Image::Pointer Image;
   ftk::Image::Pointer SubsampledImage;
   ftk::Image::Pointer LabelImage;
@@ -45,6 +52,7 @@ signals:
 protected:
   void createMenus();
   void readSettings();
+  void writeSettings();
   QMenu *fileMenu;
   QAction *loadProjectAction;
   QAction *loadImageAction;

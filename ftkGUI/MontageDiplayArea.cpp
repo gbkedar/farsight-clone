@@ -6,7 +6,7 @@ MontageDiplayArea::MontageDiplayArea(QWidget *parent)
   channelImg = NULL;
   this->setupUI();
 
-  selection = NULL; //Pointer to the region selection class
+//  regionSelection = NULL; //Pointer to the region selection class ******
 
   setMouseTracking(true);
   rubberBand = NULL;
@@ -70,7 +70,7 @@ void MontageDiplayArea::setupUI(void)
   setWindowTitle(tr("Downsampled Montage Viewer"));
 }
 
-void LabelImageViewQT::CreateRubberBand(void)
+void MontageDiplayArea::CreateRubberBand(void)
 {
   if(!rubberBand)
     rubberBand = new MyRubberBand(this);
@@ -153,7 +153,7 @@ void MontageDiplayArea::refreshBaseImage()
       painter.drawImage(0,0,gray);
     }
   }
-  this->Repaint;
+  this->repaint();
 }
 
 void MontageDiplayArea::mouseReleaseEvent(QMouseEvent *event)
@@ -174,8 +174,29 @@ void MontageDiplayArea::mouseReleaseEvent(QMouseEvent *event)
   }
 }
 
+void MontageDiplayArea::paintEvent(QPaintEvent * event)
+{	
+  QWidget::paintEvent(event);
+
+  if(baseImage.height() <= 0 || baseImage.width() <= 0)
+		return;
+
+  displayImage = baseImage;
+  QPainter painter(&displayImage);
+
+  //Do zooming:
+  int oldX = scrollArea->horizontalScrollBar()->value();
+  int oldY = scrollArea->verticalScrollBar()->value();
+
+  imageLabel->setPixmap(QPixmap::fromImage(displayImage));
+  imageLabel->adjustSize();
+
+  scrollArea->horizontalScrollBar()->setValue(oldX);
+  scrollArea->verticalScrollBar()->setValue(oldY);
+}
+
 void MontageDiplayArea::SetChannelFlags( std::vector<bool> chFlags )
 {
-  channelFlags = ch_fg;
+  channelFlags = chFlags;
   refreshBaseImage();
 }

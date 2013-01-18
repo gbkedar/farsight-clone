@@ -108,7 +108,9 @@
 #include "itkImageRegionConstIterator.h"
 #include "itkImageFileReader.h"
 
+#ifdef PROJPROC_WITH_MONT_SEG
 #include "ftkGUI/MontageView.h"
+#endif
 
 class ParamsFileDialog;
 class ProcessThread;
@@ -196,7 +198,9 @@ protected slots:
 	void updateViews();
 	void viewClosing(QWidget * view);
 	void closeViews();
-
+#ifdef PROJPROC_WITH_MONT_SEG
+	void launchMontageView(void);
+#endif
 	//For Editing Menu
 	void setCommonEnabled(bool val);
 	void setEditsEnabled(bool val);
@@ -255,7 +259,7 @@ protected slots:
 	void preprocessImage(void);
 	void unmixChannels(void);
 	void segmentNuclei(void);
-	void segmentByActiveContour();
+	void segmentByActiveContour(void);
 	void startEditing(void);
 	void stopEditing(void);
 	void startSVM();
@@ -312,7 +316,11 @@ protected:
 	std::vector<HistoWindow *> hisWin;
 	std::vector<FTKRenderWindow *> renWin;
 	PatternAnalysisWizard *pWizard;
-
+	
+#ifdef PROJPROC_WITH_MONT_SEG
+	MontageView *montageView;
+	QAction *montageViewAction;
+#endif
 	QMenu *fileMenu;
 	QAction *loadImageAction;
 	QAction *load5DImageAction;

@@ -46,6 +46,7 @@ protected slots:
 
 protected:
   void moveEvent (QMoveEvent * event);
+  void mouseMoveEvent(QMouseEvent *event);
   void mousePressEvent(QMouseEvent *event);
   void mouseReleaseEvent(QMouseEvent *event);
   void paintEvent(QPaintEvent *event);
@@ -60,11 +61,14 @@ protected:
   QSlider *hSlider;
   QSlider *vSlider;
 
+  QLabel *imageLabel;			//Contains the displayed image
+
   ftk::Image::Pointer channelImg;
 
   std::vector<bool> channelFlags;	//is channel is visible or not
 
   QImage displayImage;			//Currently displayed image
+  QImage baseImage;			//The intensity image (2D)
 
   //For Getting a Box:
   QPoint origin;

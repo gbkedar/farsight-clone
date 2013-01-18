@@ -72,7 +72,7 @@ void MontageView::DisplayChannelsMenu()
     return;
 
   std::vector<std::string> channel_names = SubsampledImage->GetChannelNames();
-  std::vector<bool> channel_status = montDisp->GetChannelFlags();
+  std::vector<bool> channel_status = imageViewer->GetChannelFlags();
 
   //remove all existing display channel actions
   for(unsigned i=0; i<displayChannelAction.size(); ++i)
@@ -124,12 +124,16 @@ void MontageView::loadImage( QString fileName )
   resetSubsampledImageAndDisplayImage();
 }
 
+void MontageView::loadProject()
+{
+}
+
 void MontageView::resetSubsampledImageAndDisplayImage()
 {
   typedef itk::Image< unsigned char, 3 > Uchar3DImageType;
   typedef itk::Image< float, 3 > Float3DImageType;
   typedef itk::MaximumProjectionImageFilter< Uchar3DImageType, Uchar3DImageType > MaxProjectType;
-  typedef itk::CastImageFilter< InputImageType, Float3DImageType > CastFilterType;
+  typedef itk::CastImageFilter< Uchar3DImageType, Float3DImageType > CastFilterType;
   typedef itk::RecursiveGaussianImageFilter< Float3DImageType, Float3DImageType > GaussianFilterType;
   typedef itk::ResampleImageFilter< Float3DImageType, Uchar3DImageType > ResampleFilterType;
   typedef itk::IdentityTransform< double, 3 >  TransformType;
@@ -154,7 +158,7 @@ void MontageView::resetSubsampledImageAndDisplayImage()
     {
       MaxProjectType::Pointer MaxProjectFilter = MaxProjectType::New();
       MaxProjectFilter->SetInput( currentChannel );
-      MaxProjectFilter->SetProjectDimension( 3 );
+      MaxProjectFilter->SetProjectionDimension( 3 );
       try
       {
 	MaxProjectFilter->Update();
@@ -171,9 +175,9 @@ void MontageView::resetSubsampledImageAndDisplayImage()
       currentChannelProjection = currentChannel;
     }
 
-    double scaleFactor = imInfo->numColumns > imInfo->numRows ? numColumns : numRows ;
+    double scaleFactor = imInfo->numColumns > imInfo->numRows ? imInfo->numColumns : imInfo->numRows ;
     scaleFactor = scaleFactor/1000.0;
-    const Uchar3DImageType::SpacingType& inputSpacing = Image->GetSpacing();
+    const Uchar3DImageType::SpacingType& inputSpacing = currentChannelProjection->GetSpacing();
     //Subsample the image setting the maximum x-y dimension to 1000pixels
     //Cast, smooth(for aliasing), then resample
     CastFilterType::Pointer caster = CastFilterType::New();
@@ -194,19 +198,19 @@ void MontageView::resetSubsampledImageAndDisplayImage()
 
     resampler->SetDefaultPixelValue( 0 );
 
-    OutputImageType::SpacingType spacing;
+    Uchar3DImageType::SpacingType spacing;
     spacing[0] = inputSpacing[0] * scaleFactor;
     spacing[1] = inputSpacing[1] * scaleFactor;
     spacing[2] = inputSpacing[2];
 
     resampler->SetOutputSpacing( spacing );
-    resampler->SetOutputOrigin( Image->GetOrigin() );
-    resampler->SetOutputDirection( Image->GetDirection() );
+    resampler->SetOutputOrigin( currentChannelProjection->GetOrigin() );
+    resampler->SetOutputDirection( currentChannelProjection->GetDirection() );
 
     Uchar3DImageType::SizeType size;
     size[0] = ((double)imInfo->numColumns)/scaleFactor;
     size[1] = ((double)imInfo->numRows)/scaleFactor;
-    size[2] = numZSlices;
+    size[2] = imInfo->numZSlices;
     resampler->SetSize( size );
 
     resampler->SetInput( smoother->GetOutput() );
@@ -217,12 +221,26 @@ void MontageView::resetSubsampledImageAndDisplayImage()
     catch( itk::ExceptionObject & excep )
     {
       std::cerr << "Exception in subsampling:\n"
-		<< excp << std::endl;
+		<< excep << std::endl;
     }
     SubsampledImage->AppendChannelFromData3D( (void *)resampler->GetOutput()->GetBufferPointer(),
 	itk::ImageIOBase::UCHAR, sizeof(Uchar3DImageType::PixelType), size[2], size[1], size[0],
 	imInfo->channelNames.at(i), imInfo->channelColors.at(i), true );
    }
   }
-  SetChannelImage( SubsampledImage )
+  SetChannelImage();
 }
+
+void MontageView::SetChannelImage()
+{
+  
+
+}
+
+void MontageView::toggleChannel( int chNum )
+{
+	std::vector<bool> ch_stats = imageViewer->GetChannelFlags();
+	ch_stats[chNum] = !ch_stats[chNum];
+	imageViewer->SetChannelFlags( ch_stats );
+}
+

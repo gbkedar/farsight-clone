@@ -70,7 +70,6 @@ NucleusEditor::NucleusEditor(QWidget * parent, Qt::WindowFlags flags)
 	tblWin.clear();
 	pltWin.clear();
 	renWin.clear();
-	//	hisWin.clear();
 	pWizard=NULL;
 
 	myImg = NULL;
@@ -84,6 +83,10 @@ NucleusEditor::NucleusEditor(QWidget * parent, Qt::WindowFlags flags)
 	NucAdjTable = NULL;
 	CellAdjTable = NULL;
 	this->HeatmapWin = NULL;
+
+#ifdef PROJPROC_WITH_MONT_SEG
+	montageView = NULL;
+#endif
 
 #ifdef USE_TRACKING
 	mfcellTracker = NULL;
@@ -456,15 +459,12 @@ void NucleusEditor::createMenus()
 	connect(newRenderAction,SIGNAL(triggered()),this,SLOT(CreateNewRenderWindow()));
 	viewMenu->addAction(newRenderAction);
 
-	//ragMenu = viewMenu->addMenu(tr("New Region Adjacency Graph"));
-
-	//nucRagAction = new QAction(tr("Nuclear Adjacency Graph"), this);	
-	//connect(nucRagAction, SIGNAL(triggered()), this, SLOT(CreateNewNucRAG()));
-	//ragMenu->addAction(nucRagAction);
-
-	//cellRagAction = new QAction(tr("Cellular Adjacency Graph"), this);
-	//connect(cellRagAction, SIGNAL(triggered()), this, SLOT(CreateNewCellRAG()));
-	//ragMenu->addAction(cellRagAction);
+#ifdef PROJPROC_WITH_MONT_SEG
+	montageViewAction = new QAction(tr("Launch Montage View"),this);
+	montageViewAction->setObjectName("montageViewAction");
+	connect(montageViewAction, SIGNAL(triggered()), this, SLOT(launchMontageView()) );
+	viewMenu->addAction(montageViewAction);
+#endif
 
 	imageIntensityAction = new QAction(tr("Adjust Image Intensity"), this);
 	imageIntensityAction->setObjectName("imageIntensityAction");
@@ -539,11 +539,6 @@ void NucleusEditor::createMenus()
 	connect(databaseAction, SIGNAL(triggered()), this, SLOT(updateDatabase()));
 	toolMenu->addAction(databaseAction);
 
-	activeContourAction = new QAction(tr("Active Contour"), this);
-	activeContourAction->setObjectName("activeContourAction");
-	connect(activeContourAction, SIGNAL(triggered()), this, SLOT(segmentByActiveContour()));
-	toolMenu->addAction(activeContourAction);
-
 	activeMenu   = toolMenu->addMenu(tr("Active Learning"));
 	activeMenu->setObjectName("activeMenu");
 
@@ -596,6 +591,10 @@ void NucleusEditor::createMenus()
 	connect(runClusAction, SIGNAL(triggered()), this, SLOT(runClus()));
 	toolMenu->addAction(runClusAction);
 
+	activeContourAction = new QAction(tr("Active Contour"), this);
+	activeContourAction->setObjectName("activeContourAction");
+	connect(activeContourAction, SIGNAL(triggered()), this, SLOT(segmentByActiveContour()));
+	toolMenu->addAction(activeContourAction);
 
 	//EDITING MENU
 	editMenu = menuBar()->addMenu(tr("&Editing"));
@@ -3028,6 +3027,35 @@ void NucleusEditor::displayKymoGraph()
 	kymoView = new TrackingKymoView(myImg,nucSeg->featureVector4DImage,segView,selection);
 	myview = new Image3DView(myImg,labImg,segView,selection);	// Constructor
 
+}
+#endif
+
+
+//**********************************************************************
+// SLOT: start montagae view view:
+//**********************************************************************
+#ifdef PROJPROC_WITH_MONT_SEG
+void NucleusEditor::launchMontageView()
+{
+	if( montageView )
+	{
+		QMessageBox msgBox;
+		msgBox.setInformativeText("There is already a Montage View window open");
+		msgBox.setStandardButtons(QMessageBox::Ok);
+		msgBox.setDefaultButton(QMessageBox::Ok);
+		int ret = msgBox.exec();
+		return;
+	}
+	//Delete current images
+	this->clearSelections();
+	if(labImg)
+		delete labImg;
+	if(myImg)
+		delete myImg;
+	segView->SetChannelImage(myImg);
+	segView->SetLabelImage(myImg);
+	this->closeViews();
+	montageView = new MontageView(this);
 }
 #endif
 //**********************************************************************
