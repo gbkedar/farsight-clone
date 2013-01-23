@@ -36,12 +36,10 @@ public slots:
 
 
 signals:
-    void boxDrawn(int x1, int y1, int x2, int y2, int z);
+  void boxDrawn(int x1, int y1, int x2, int y2, int z);
 
 protected slots:
   void refreshBaseImage(void);
-/*  void updateVSlider(void);
-  void updateHSlider(void); */
   void initChannelFlags(void);
 
 protected:
@@ -58,12 +56,11 @@ protected:
   QMap<QString, QColor> * colorItemsMap;
   //UI Widgets:
   QScrollArea *scrollArea;
-  QSlider *hSlider;
-  QSlider *vSlider;
 
   QLabel *imageLabel;			//Contains the displayed image
 
   ftk::Image::Pointer channelImg;
+  itk::SizeValueType totalWidth, totalHeight;
 
   std::vector<bool> channelFlags;	//is channel is visible or not
 
@@ -73,6 +70,7 @@ protected:
   //For Getting a Box:
   QPoint origin;
   MyRubberBand *rubberBand;
+  bool mousePress;
 };
 
 #endif //MONTAGE_DISPLAY_H

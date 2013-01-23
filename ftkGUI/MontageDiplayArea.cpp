@@ -4,15 +4,16 @@ MontageDiplayArea::MontageDiplayArea(QWidget *parent)
   : QWidget(parent)
 {
   channelImg = NULL;
+  totalWidth = totalHeight = 0;
+  channelFlags.clear();
+
   this->setupUI();
 
 //  regionSelection = NULL; //Pointer to the region selection class ******
 
   setMouseTracking(true);
   rubberBand = NULL;
-
-  channelFlags.clear();
-
+  mousePress = false;
 }
 
 
@@ -23,26 +24,6 @@ MontageDiplayArea::~MontageDiplayArea()
 
 void MontageDiplayArea::setupUI(void)
 {
-
-  //Setup Sliders
-  vSlider = new QSlider();
-  vSlider->setOrientation(Qt::Vertical);
-  vSlider->setDisabled(true);
-  vSlider->setRange(0,0);
-  vSlider->setValue(0);
-
-  QGridLayout *vsliderLayout = new QGridLayout;
-  vsliderLayout->addWidget(vSlider,1,0,1,1);
-
-  hSlider = new QSlider();
-  hSlider->setOrientation(Qt::Horizontal);
-  hSlider->setDisabled(true);
-  hSlider->setRange(0,0);
-  hSlider->setValue(0);
-
-  QHBoxLayout *hsliderLayout = new QHBoxLayout;
-  hsliderLayout->addWidget(hSlider);
-
   //Setup image display area
   imageLabel = new QLabel();
   imageLabel->setBackgroundRole(QPalette::Base);
@@ -61,8 +42,6 @@ void MontageDiplayArea::setupUI(void)
 
   QGridLayout *viewerLayout = new QGridLayout();
   viewerLayout->addWidget(scrollArea, 0, 0);
-  viewerLayout->addLayout(vsliderLayout, 0, 1);
-  viewerLayout->addLayout(hsliderLayout, 1, 0);
 
   QGridLayout *allLayout = new QGridLayout;
   allLayout->addLayout(viewerLayout,1,0);
@@ -75,30 +54,61 @@ void MontageDiplayArea::setupUI(void)
 
 void MontageDiplayArea::CreateRubberBand(void)
 {
-  if(!rubberBand)
-    rubberBand = new MyRubberBand(this);
+  if(rubberBand)
+    delete rubberBand;
+  rubberBand = new MyRubberBand(this);
 }
 
 void MontageDiplayArea::mousePressEvent(QMouseEvent *event)
 {
-  origin = event->pos();		//Do i need this
-  if(rubberBand)
-  {
-    rubberBand->setGeometry(QRect(origin,QSize()));
-    rubberBand->show();
+  if(!channelImg)
     return;
-  }
+
+  mousePress = true;
+  this->CreateRubberBand();
+  origin = event->pos();
+  rubberBand->setGeometry(QRect(origin,QSize()));
+  rubberBand->show();
+  return;
 }
 
 void MontageDiplayArea::mouseMoveEvent(QMouseEvent *event)
 {
   QPoint pos = event->pos();
-  if(rubberBand)
+  if(mousePress)
   {
+    QPoint corner = scrollArea->pos();
+    QPoint v_pos = pos - corner;  // This is a local position (in viewport coordinates)
+    int xx = v_pos.x() + scrollArea->horizontalScrollBar()->value();
+    int yy = v_pos.y() + scrollArea->verticalScrollBar()->value();
+    if( xx>=0 && xx<totalWidth && yy>=0 && yy<totalHeight )
     if(pos.x() <= origin.x() || pos.y() <= origin.y())
       rubberBand->setGeometry(QRect(origin,QSize()));
     else
       rubberBand->setGeometry(QRect(origin, pos).normalized());
+  }
+}
+
+void MontageDiplayArea::moveEvent ( QMoveEvent * event )
+{
+	QWidget::moveEvent ( event );
+}
+
+
+void MontageDiplayArea::mouseReleaseEvent(QMouseEvent *event)
+{
+  if(rubberBand)
+  {
+    QPoint corner = scrollArea->pos();
+    QPoint pos = event->pos() - corner;
+    QPoint org = origin - corner;
+    int x1 = (org.x() + scrollArea->horizontalScrollBar()->value());
+    int y1 = (org.y() + scrollArea->verticalScrollBar()->value());
+    int x2 = (pos.x() + scrollArea->horizontalScrollBar()->value());
+    int y2 = (pos.y() + scrollArea->verticalScrollBar()->value());
+    std::cout<<"Selection:"<<"x="<<x1<<"\t"<<x2<<"\ty="<<y1<<"\t"<<y2<<std::endl;
+    rubberBand->setMouseTracking(false);
+    mousePress = false;
   }
 }
 
@@ -131,8 +141,8 @@ void MontageDiplayArea::refreshBaseImage()
   const ftk::Image::Info *info;
   if(channelImg)    info = channelImg->GetImageInfo();
   else return;
-  itk::SizeValueType totalWidth  = (*info).numColumns;
-  itk::SizeValueType totalHeight = (*info).numRows;
+  totalWidth  = (*info).numColumns;
+  totalHeight = (*info).numRows;
   baseImage = QImage(totalWidth, totalHeight, QImage::Format_ARGB32_Premultiplied);
   baseImage.fill(qRgb(0,0,0));
   
@@ -159,30 +169,6 @@ void MontageDiplayArea::refreshBaseImage()
   this->repaint();
 }
 
-void MontageDiplayArea::moveEvent ( QMoveEvent * event )
-{
-	QWidget::moveEvent ( event );
-}
-
-
-void MontageDiplayArea::mouseReleaseEvent(QMouseEvent *event)
-{
-  if(rubberBand)
-  {
-    QPoint corner = scrollArea->pos();
-    QPoint pos = event->pos() - corner;
-    QPoint org = origin - corner;
-    int x1 = (org.x() + scrollArea->horizontalScrollBar()->value());
-    int y1 = (org.y() + scrollArea->verticalScrollBar()->value());
-    int x2 = (pos.x() + scrollArea->horizontalScrollBar()->value());
-    int y2 = (pos.y() + scrollArea->verticalScrollBar()->value());
-
-    delete rubberBand;
-
-    CreateRubberBand();
-  }
-}
-
 void MontageDiplayArea::paintEvent(QPaintEvent * event)
 {	
   QWidget::paintEvent(event);
@@ -193,7 +179,6 @@ void MontageDiplayArea::paintEvent(QPaintEvent * event)
   displayImage = baseImage;
   QPainter painter(&displayImage);
 
-  //Do zooming:
   int oldX = scrollArea->horizontalScrollBar()->value();
   int oldY = scrollArea->verticalScrollBar()->value();
 

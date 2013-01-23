@@ -614,9 +614,15 @@ bool Image::AppendChannelFromData3D(void *dptr, DataType dataType, int bpPix, it
 	else	//Check to be sure sizes match!
 	{
 		if(m_Info.numColumns != cs || m_Info.numRows != rs || m_Info.numZSlices != zs)
+		{
+			std::cerr<<"Error: The size of the channels do not match\n";
 			return false;
+		}
 		if(m_Info.bytesPerPix != bpPix || m_Info.dataType != dataType || m_Info.numTSlices != 1)
+		{
+			std::cerr<<"Error: The data types of channels do not match\n";
 			return false;
+		}
 	}
 
 	m_Info.numChannels++;					//Increment the Number of Channels in this Image (ch)

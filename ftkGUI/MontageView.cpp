@@ -12,9 +12,14 @@ MontageView::MontageView( QWidget * parent )
   chSignalMapper = NULL;
 
   imageViewer = new MontageDiplayArea();
+  QPushButton *allButton = new QPushButton(tr("All"));
+  this->setCentralWidget(imageViewer);
 
   this->createMenus();
+  this->createToolBar();
   this->readSettings();
+
+  this->resize(300,100);
 }
 
 MontageView::~MontageView()
@@ -131,7 +136,10 @@ void MontageView::loadImage( QString fileName )
   }
   //Clear image in nucleus editor *****
   //Clear label and table *****
-  resetSubsampledImageAndDisplayImage();
+  if(!Image)
+    std::cerr<<"Failed to load montage image\n";
+  else
+    resetSubsampledImageAndDisplayImage();
 }
 
 void MontageView::loadProject()
@@ -157,9 +165,10 @@ void MontageView::resetSubsampledImageAndDisplayImage()
   if( SubsampledImage )
     delete SubsampledImage;
 
-  ftk::Image::Pointer SubsampledImage = ftk::Image::New();
+  SubsampledImage = ftk::Image::New();
   const ftk::Image::Info * imInfo = Image->GetImageInfo();
   std::vector< std::string > filenames = Image->GetFilenames();
+  Uchar3DImageType::SizeType size;
   if( imInfo->numColumns<1000 && imInfo->numRows<1000 )
     SubsampledImage = Image; //Just in case...
   else
@@ -222,7 +231,6 @@ void MontageView::resetSubsampledImageAndDisplayImage()
     resampler->SetOutputOrigin( currentChannelProjection->GetOrigin() );
     resampler->SetOutputDirection( currentChannelProjection->GetDirection() );
 
-    Uchar3DImageType::SizeType size;
     size[0] = ((double)imInfo->numColumns)/scaleFactor;
     size[1] = ((double)imInfo->numRows)/scaleFactor;
     size[2] = imInfo->numZSlices;
@@ -242,7 +250,7 @@ void MontageView::resetSubsampledImageAndDisplayImage()
     rescale->SetOutputMaximum( itk::NumericTraits<Uchar3DImageType::PixelType>::max() );
     rescale->SetOutputMinimum( itk::NumericTraits<Uchar3DImageType::PixelType>::min() );
 
-    std::string opstring = ftk::GetFilePath( filenames.at(i) )+ "/" + imInfo->channelNames.at(i) + ".tif";
+    std::string opstring = ftk::GetFilePath( filenames.at(i) )+ "/" + imInfo->channelNames.at(i) + "_subsample.tif";
     typedef itk::ImageFileWriter< Uchar3DImageType > ImageFileWriterType;
     ImageFileWriterType::Pointer writer = ImageFileWriterType::New();
     writer->SetFileName( opstring.c_str() );
@@ -261,17 +269,23 @@ void MontageView::resetSubsampledImageAndDisplayImage()
 		<< excep << std::endl;
     }
     SubsampledImage->AppendChannelFromData3D( (void *)resampler->GetOutput()->GetBufferPointer(),
-	itk::ImageIOBase::UCHAR, sizeof(Uchar3DImageType::PixelType), size[2], size[1], size[0],
+	itk::ImageIOBase::UCHAR, sizeof(Uchar3DImageType::PixelType), size[0], size[1], size[2],
 	imInfo->channelNames.at(i), imInfo->channelColors.at(i), true );
+    std::cout	<<"Channel image name "<<SubsampledImage->GetChannelNames().at(i)
+		<<"\tsize:\tz="<<size[2]<<"\ty="<<size[1]<<"\tx="<<size[0]<<std::endl;
    }
   }
+  int resizeRows, resizeCols;
+  resizeRows = (int)(size[1]+46);  //Always less than 1000
+  resizeCols = (int)(size[0]+20);  //Always less than 1000
+  this->resize(resizeCols,resizeRows); //Image size plus some for the menus and bezel
   SetChannelImage();
 }
 
 void MontageView::SetChannelImage()
 {
-  
-
+  imageViewer->SetChannelImage( SubsampledImage );
+  //Clear nucleus editor views, label and table ***************
 }
 
 void MontageView::toggleChannel( int chNum )
