@@ -8,6 +8,8 @@
 #include <QtGui/QMenu>
 #include <QtGui/QAction>
 #include <QtGui/QWidget>
+#include <QtGui/QToolBar>
+#include <QtGui/QButtonGroup>
 #include <QtCore/QSignalMapper>
 #include <QApplication>
 #include <QFileDialog>
@@ -43,10 +45,12 @@ protected slots:
   void loadProject(void);
   void askLoadImage(void);
   void DisplayChannelsMenu(void);
+  void cropRegion(void);
   void toggleChannel(int chNum);
   void loadImage(QString fileName);
   void resetSubsampledImageAndDisplayImage(void);
   void SetChannelImage(void);
+  void enableRegionSelButton(bool);
 
 private:
   ftk::Image::Pointer Image;
@@ -59,6 +63,9 @@ protected:
   void createMenus();
   void readSettings();
   void writeSettings();
+  void connectSlotsToViewer();
+  void createToolBar();
+
   QMenu *fileMenu;
   QAction *loadProjectAction;
   QAction *loadImageAction;
@@ -70,6 +77,8 @@ protected:
   QVector<QAction *> displayChannelAction;
   QString standardImageTypes;
 
+  QPushButton *cropButton;
+  QToolBar *toolbar;
   QString lastPath;
 };
 #endif //MONTAGE_VIEW_H

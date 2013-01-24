@@ -83,9 +83,13 @@ void MontageDiplayArea::mouseMoveEvent(QMouseEvent *event)
     int yy = v_pos.y() + scrollArea->verticalScrollBar()->value();
     if( xx>=0 && xx<totalWidth && yy>=0 && yy<totalHeight )
     if(pos.x() <= origin.x() || pos.y() <= origin.y())
+    {
       rubberBand->setGeometry(QRect(origin,QSize()));
+    }
     else
+    {
       rubberBand->setGeometry(QRect(origin, pos).normalized());
+    }
   }
 }
 
@@ -109,6 +113,10 @@ void MontageDiplayArea::mouseReleaseEvent(QMouseEvent *event)
     std::cout<<"Selection:"<<"x="<<x1<<"\t"<<x2<<"\ty="<<y1<<"\t"<<y2<<std::endl;
     rubberBand->setMouseTracking(false);
     mousePress = false;
+    if( x1<x2 && y1<y2 )
+      emit selectionDrawn(true);
+    else
+      emit selectionDrawn(false);
   }
 }
 

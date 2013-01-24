@@ -18,6 +18,7 @@ MontageView::MontageView( QWidget * parent )
   this->createMenus();
   this->createToolBar();
   this->readSettings();
+  this->connectSlotsToViewer();
 
   this->resize(300,100);
 }
@@ -79,6 +80,27 @@ void MontageView::createMenus()
   displayChannelMenu->setObjectName("displayChannelMenu");
   connect(displayChannelMenu, SIGNAL(aboutToShow()), this, SLOT(DisplayChannelsMenu()));
 
+}
+
+void MontageView::createToolBar()
+{
+  toolbar = this->addToolBar(tr("toolbar"));
+  cropButton = new QPushButton(tr("Export Region"));
+  connect(cropButton, SIGNAL(clicked()), this, SLOT(cropRegion()));
+  cropButton->setDefault(false);
+  cropButton->setAutoDefault(false);
+  cropButton->setEnabled(false);
+  toolbar->addWidget(cropButton);
+}
+
+void MontageView::connectSlotsToViewer()
+{
+  connect( imageViewer, SIGNAL(selectionDrawn(bool)), this, SLOT(enableRegionSelButton(bool)) );
+}
+
+void MontageView::enableRegionSelButton( bool enable )
+{
+  cropButton->setEnabled(enable);
 }
 
 void MontageView::DisplayChannelsMenu()
@@ -144,6 +166,12 @@ void MontageView::loadImage( QString fileName )
 
 void MontageView::loadProject()
 {
+  
+}
+
+void MontageView::cropRegion()
+{
+  
 }
 
 //Take the maximum intensity projection and subsample each channel

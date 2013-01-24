@@ -36,7 +36,8 @@ public slots:
 
 
 signals:
-  void boxDrawn(int x1, int y1, int x2, int y2, int z);
+//  void boxDrawn(int x1, int y1, int x2, int y2, int z);
+  void selectionDrawn(bool);
 
 protected slots:
   void refreshBaseImage(void);
