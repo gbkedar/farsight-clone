@@ -36,7 +36,7 @@
 
 #include "ftkImage.h"
 #include "ftkCommon/ftkUtils.h"
-#include "Nuclear_Association/ftkNuclearAssociationRules.h"
+#include "NuclearSegmentation/Nuclear_Association/ftkNuclearAssociationRules.h"
 #include "itkImageFileReader.h"
 #include "itkImageFileWriter.h"
 #include "itkImageRegionConstIterator.h"

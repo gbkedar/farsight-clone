@@ -8,6 +8,9 @@ MontageView::MontageView( QWidget * parent )
   Image = NULL;
   SubsampledImage = NULL;
   LabelImage = NULL;
+  Table = NULL;
+  tree = NULL;
+  scaleFactor = DBL_MAX;
 
   chSignalMapper = NULL;
 
@@ -141,10 +144,13 @@ void MontageView::askLoadImage()
   QString fileName = QFileDialog::getOpenFileName(this, "Open Image", lastPath, standardImageTypes);
   if(fileName == "")
     return; //No file returned
-  this->loadImage(fileName);
+  if( this->loadImage(fileName) )
+    resetSubsampledImageAndDisplayImage();
+  else
+    return;
 }
 
-void MontageView::loadImage( QString fileName )
+bool MontageView::loadImage( QString fileName )
 {
   lastPath = QFileInfo(fileName).absolutePath() + QDir::separator();
   QString name = QFileInfo(fileName).fileName();
@@ -154,24 +160,124 @@ void MontageView::loadImage( QString fileName )
   else
   {
     std::cerr<<"Can only load xml image files\n";
-    return;
+    return false;
   }
   //Clear image in nucleus editor *****
   //Clear label and table *****
   if(!Image)
+  {
     std::cerr<<"Failed to load montage image\n";
-  else
-    resetSubsampledImageAndDisplayImage();
+    return false;
+  }
+  return true;
 }
 
 void MontageView::loadProject()
 {
-  
+  QString filename = QFileDialog::getOpenFileName(this, "Open project...", lastPath, tr("XML Project File(*.xml)"));
+  if(filename == "")
+    return;
+
+  QString path = QFileInfo(filename).absolutePath();
+  lastPath = path;
+
+  projectFiles.Read(filename.toStdString());
+
+  if( this->loadImage( QString::fromStdString( projectFiles.GetFullInput()) ) )
+    resetSubsampledImageAndDisplayImage();
+  else return;
+
+  projectDefinition.Load( projectFiles.GetFullDef() );
+
+  QString labelName = QString::fromStdString( projectFiles.GetFullOutput() );
+  QString myExt = QFileInfo( labelName ).suffix();
+  if( myExt == "xml")
+    LabelImage = ftk::LoadXMLImage( labelName.toStdString() );
+  else
+  {
+    LabelImage = ftk::Image::New();
+    if( !LabelImage->LoadFile( labelName.toStdString() ) )
+      LabelImage = NULL;
+  }
+
+  if( !LabelImage )
+  {
+    std::cerr<<"Could not load the label image. Table will not be loaded\n";
+    if( Table )
+      Table = NULL;
+    return;
+  }
+
+  Table = ftk::LoadTable( projectFiles.GetFullTable() );
+  if(!Table)
+  {
+    std::cerr<<"Could not load the table\n";
+    return;
+  }
+
+  this->IndexTable();
+
+}
+
+void MontageView::IndexTable()
+{
+  if(!Table)
+  {
+    std::cerr<<"Could not load the table\n";
+    return;
+  }
+  //We only need the x-y as the whole z-stack is used when cropping
+  SampleType::Pointer sample = SampleType::New();
+  MeasurementVectorType mv;
+
+  for( itk::SizeValueType i=0; i<Table->GetNumberOfRows(); ++i )
+  {
+    mv[0] = Table->GetValueByName(i,"centroid_x").ToDouble();
+    mv[1] = Table->GetValueByName(i,"centroid_y").ToDouble();
+    sample->PushBack( mv );
+  }
+  typedef itk::Statistics::KdTreeGenerator< SampleType > TreeGeneratorType;
+  TreeGeneratorType::Pointer treeGenerator = TreeGeneratorType::New();
+
+  treeGenerator->SetSample( sample );
+  treeGenerator->SetBucketSize( 10 );
+  treeGenerator->Update();
+  tree = treeGenerator->GetOutput();
 }
 
 void MontageView::cropRegion()
 {
-  
+  std::vector< int > coordinates = imageViewer->GetCoordinates();
+  if( coordinates.size()!=4 )
+  {
+    std::cerr<<"Error in reading selection coordinates from montage display\n";
+    return;
+  }
+
+  const ftk::Image::Info * imInfo = Image->GetImageInfo();
+
+  //Translate the coordinates into the space of the original image
+  itk::SizeValueType x1, y1, z1, x2, y2, z2;
+  z1 = 0; z2 = imInfo->numZSlices-1;
+  x1 = (((double)coordinates.at(0))*scaleFactor);
+  y1 = (((double)coordinates.at(1))*scaleFactor);
+  x2 = (((double)coordinates.at(2))*scaleFactor);
+  y2 = (((double)coordinates.at(3))*scaleFactor);
+
+  if( x2>=imInfo->numColumns )
+    x2 = imInfo->numColumns-1;
+  if( y2>imInfo->numRows )
+    y2 = imInfo->numRows-1;
+
+  if( x1>=x2 || y1>=y2 )
+  {
+    std::cerr<<"Error in reading selection coordinates from montage display\n";
+    return;
+  }
+
+  //Crop channels
+ // ftk::Image::Pointer cropChannelsImage = 
+
 }
 
 //Take the maximum intensity projection and subsample each channel
@@ -227,7 +333,7 @@ void MontageView::resetSubsampledImageAndDisplayImage()
       currentChannelProjection = currentChannel;
     }
 
-    double scaleFactor = imInfo->numColumns > imInfo->numRows ? imInfo->numColumns : imInfo->numRows ;
+    scaleFactor = imInfo->numColumns > imInfo->numRows ? imInfo->numColumns : imInfo->numRows ;
     scaleFactor = scaleFactor/1000.0;
     const Uchar3DImageType::SpacingType& inputSpacing = currentChannelProjection->GetSpacing();
 
@@ -278,7 +384,8 @@ void MontageView::resetSubsampledImageAndDisplayImage()
     rescale->SetOutputMaximum( itk::NumericTraits<Uchar3DImageType::PixelType>::max() );
     rescale->SetOutputMinimum( itk::NumericTraits<Uchar3DImageType::PixelType>::min() );
 
-    std::string opstring = ftk::GetFilePath( filenames.at(i) )+ "/" + imInfo->channelNames.at(i) + "_subsample.tif";
+    std::string opstring = ftk::GetFilePath( filenames.at(i) )+ "/" 
+    			   + imInfo->channelNames.at(i) + "_subsample.tif";
     typedef itk::ImageFileWriter< Uchar3DImageType > ImageFileWriterType;
     ImageFileWriterType::Pointer writer = ImageFileWriterType::New();
     writer->SetFileName( opstring.c_str() );
@@ -304,9 +411,9 @@ void MontageView::resetSubsampledImageAndDisplayImage()
    }
   }
   int resizeRows, resizeCols;
-  resizeRows = (int)(size[1]+46);  //Always less than 1000
+  resizeRows = (int)(size[1]+78);  //Always less than 1000
   resizeCols = (int)(size[0]+20);  //Always less than 1000
-  this->resize(resizeCols,resizeRows); //Image size plus some for the menus and bezel
+  this->resize(resizeCols,resizeRows); //Image size plus some for the menus, toolbar and bezel
   SetChannelImage();
 }
 
@@ -322,4 +429,3 @@ void MontageView::toggleChannel( int chNum )
 	ch_stats[chNum] = !ch_stats[chNum];
 	imageViewer->SetChannelFlags( ch_stats );
 }
-

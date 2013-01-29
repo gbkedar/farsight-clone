@@ -31,6 +31,7 @@ limitations under the License.
 #include <itkLightObject.h>
 #include <itkObjectFactory.h>
 #include <itkSmartPointer.h>
+#include <itkRegionOfInterestImageFilter.h>
 
 //VTK includes:
 #include "vtkImageData.h"
@@ -79,7 +80,7 @@ public:
 
 	bool AppendChannelFromData3D(void *dptr, DataType dataType, int bpPix, itk::SizeValueType cs, itk::SizeValueType rs, itk::SizeValueType zs, std::string name, std::vector<unsigned char> color, bool copy);
 	bool AppendImageFromData3D(void *dptr, DataType dataType, int bpPix, itk::SizeValueType cs, itk::SizeValueType rs, itk::SizeValueType zs, std::string name, bool copy);
-	bool AppendImage(ftk::Image::Pointer img, PtrMode mode);	//Will add the image data as a new time slice or slices if all other sizes match.
+	bool AppendImage(ftk::Image::Pointer img, PtrMode mode);	//Will add the image data as a new time slice or slices if all other sizes match
 	bool AppendImage(ftk::Image::Pointer img, PtrMode mode, bool isforOneTime);    // overloaded function	
 	void SetSpacing(float x, float y, float z);
 
@@ -99,6 +100,10 @@ public:
 	template <typename newType> void Cast();	//Cast the Image to newType (does not scale)
 	template <typename pixelType> typename itk::Image<pixelType, 3>::Pointer GetItkPtr(itk::SizeValueType T, itk::SizeValueType CH, PtrMode mode = DEFAULT);	//IF pixelType agrees with image pixel type, PtrMode defaults to DEFAULT
 	template <typename pixelType> pixelType * GetSlicePtr(itk::SizeValueType T, itk::SizeValueType CH, itk::SizeValueType Z,PtrMode mode = DEFAULT);	// IF pixelType agrees with image pixel type (NOTE MEMORY MANAGER DOES NOT CHANGE)
+	template <typename pixelType> ftk::Image::Pointer
+	  CropImage( itk::SizeValueType x1, itk::SizeValueType y1, itk::SizeValueType z1,
+	  	     itk::SizeValueType x2, itk::SizeValueType y2, itk::SizeValueType z2,
+		     DataType dataType, int bpPix );
 
 	typedef struct 
 	{

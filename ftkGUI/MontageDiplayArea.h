@@ -31,6 +31,7 @@ public:
   void SetChannelImage(ftk::Image::Pointer img);
   std::vector<bool> GetChannelFlags(void){ return channelFlags; };
   void SetChannelFlags(std::vector<bool> chFlags);
+  std::vector< int > GetCoordinates();
 
 public slots:
 
@@ -72,6 +73,7 @@ protected:
   QPoint origin;
   MyRubberBand *rubberBand;
   bool mousePress;
+  int x1, x2, y1, y2;
 };
 
 #endif //MONTAGE_DISPLAY_H

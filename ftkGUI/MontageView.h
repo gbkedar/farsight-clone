@@ -20,12 +20,15 @@
 #include "itkCastImageFilter.h"
 #include "itkRecursiveGaussianImageFilter.h"
 #include "itkResampleImageFilter.h"
+#include "itkKdTreeGenerator.h"
 
 #include "MontageDiplayArea.h"
 
 //Testing
 #include "ftkCommon/ftkUtils.h"
 #include "itkImageFileWriter.h"
+#include "NuclearSegmentation/NucleusEditor/ftkProjectFiles.h"
+#include "NuclearSegmentation/NucleusEditor/ftkProjectDefinition.h"
 
 class MontageView : public QMainWindow
 {
@@ -47,16 +50,26 @@ protected slots:
   void DisplayChannelsMenu(void);
   void cropRegion(void);
   void toggleChannel(int chNum);
-  void loadImage(QString fileName);
+  bool loadImage(QString fileName);
   void resetSubsampledImageAndDisplayImage(void);
   void SetChannelImage(void);
   void enableRegionSelButton(bool);
+  void IndexTable(void);
 
 private:
+  typedef itk::Vector< float, 2 > MeasurementVectorType;
+  typedef itk::Statistics::ListSample< MeasurementVectorType > SampleType;
+  typedef itk::Statistics::KdTreeGenerator< SampleType > TreeGeneratorType;
+  typedef TreeGeneratorType::KdTreeType TreeType;
+
   ftk::Image::Pointer Image;
   ftk::Image::Pointer SubsampledImage;
   ftk::Image::Pointer LabelImage;
   vtkSmartPointer<vtkTable> Table;
+  TreeType::Pointer tree;				//Fast indexing of the table
+  ftk::ProjectFiles projectFiles;			//files in the currently visible project
+  ftk::ProjectDefinition projectDefinition;		//the project definition currently being used.
+  double scaleFactor;
 
 signals:
 protected:

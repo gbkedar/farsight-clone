@@ -32,7 +32,7 @@
 #include <tinyxml/tinyxml.h>
 #include <ftkCommon/ftkUtils.h>
 #include <ftkFeatures/ftkObjectAssociation.h>
-#include <PixelAnalysis/ftkPixelLevelAnalysis.h>
+#include <NuclearSegmentation/PixelAnalysis/ftkPixelLevelAnalysis.h>
 
 #include <vector>
 #include <string>

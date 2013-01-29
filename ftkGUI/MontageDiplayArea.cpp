@@ -106,11 +106,10 @@ void MontageDiplayArea::mouseReleaseEvent(QMouseEvent *event)
     QPoint corner = scrollArea->pos();
     QPoint pos = event->pos() - corner;
     QPoint org = origin - corner;
-    int x1 = (org.x() + scrollArea->horizontalScrollBar()->value());
-    int y1 = (org.y() + scrollArea->verticalScrollBar()->value());
-    int x2 = (pos.x() + scrollArea->horizontalScrollBar()->value());
-    int y2 = (pos.y() + scrollArea->verticalScrollBar()->value());
-    std::cout<<"Selection:"<<"x="<<x1<<"\t"<<x2<<"\ty="<<y1<<"\t"<<y2<<std::endl;
+    x1 = org.x() + scrollArea->horizontalScrollBar()->value();
+    y1 = org.y() + scrollArea->verticalScrollBar()->value();
+    x2 = pos.x() + scrollArea->horizontalScrollBar()->value();
+    y2 = pos.y() + scrollArea->verticalScrollBar()->value();
     rubberBand->setMouseTracking(false);
     mousePress = false;
     if( x1<x2 && y1<y2 )
@@ -118,6 +117,23 @@ void MontageDiplayArea::mouseReleaseEvent(QMouseEvent *event)
     else
       emit selectionDrawn(false);
   }
+}
+
+std::vector< int > MontageDiplayArea::GetCoordinates()
+{
+  std::vector< int > outputVector;
+  if(rubberBand)
+  {
+    outputVector.push_back( x1 );
+    outputVector.push_back( y1 );
+    outputVector.push_back( x2 );
+    outputVector.push_back( y2 );
+  }
+  else
+  {
+    outputVector.clear();
+  }
+    return outputVector;
 }
 
 void MontageDiplayArea::SetChannelImage(ftk::Image::Pointer img)

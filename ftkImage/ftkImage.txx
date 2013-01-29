@@ -591,5 +591,68 @@ template< typename TComp, itk::SizeValueType channels > void Image::LoadImageITK
 	img = 0;		//itk smartpointer cleans itself	
 }
 
+template <typename pixelType> ftk::Image::Pointer
+  Image::CropImage( itk::SizeValueType x1, itk::SizeValueType y1, itk::SizeValueType z1,
+		    itk::SizeValueType x2, itk::SizeValueType y2, itk::SizeValueType z2,
+		    DataType dataType, int bpPix )
+{
+  typedef typename itk::Image< pixelType, 3 > OutputImageType;
+  typedef itk::RegionOfInterestImageFilter< OutputImageType, OutputImageType > ROIFilterType;
+
+  //Implemented for only multichannel images
+  if( this->m_Info.numTSlices>1 )
+  {
+    std::cerr << "Cropping not implemented for time series images\n";
+    return NULL;
+    //Load first crop image with AppendChannelFromData3D and then cereate new channel images
+    //and use AppendImage() for subsequent time points
+  }
+
+  //Check crop indices against each other and image dimensions
+  if( x1>x2 || y1>y2 || z1>z2 )
+  {
+    std::cerr << "The first index for cropping has to be larger than the second\n";
+    return NULL;
+  }
+
+  if( x2>=this->m_Info.numColumns || //x1<0 || y1<0 || z1<0 since unsigned not necessary
+      y2>=this->m_Info.numRows    ||
+      z2>=this->m_Info.numZSlices )
+  {
+    std::cerr << "Cropping indices out of bounds\n";
+    return NULL;
+  }
+
+  ftk::Image::Pointer returnImage = ftk::Image::New();
+
+  for( itk::SizeValueType j = 0; j<this->m_Info.numChannels; ++j )
+  {
+    typename OutputImageType::Pointer currentChannel = this->GetItkPtr<pixelType>(0,j);
+    typename ROIFilterType::Pointer CropImageFilter = ROIFilterType::New();
+    CropImageFilter->SetInput( currentChannel );
+    typename OutputImageType::RegionType CroppedRegion;
+    typename OutputImageType::IndexType Start;
+    Start[0] = x1; Start[1] = y1; Start[2] = z1;
+    typename OutputImageType::SizeType Size;
+    Size[0] = x2-x1; Size[1] = y2-y1; Size[2] = z2-z1;
+    CroppedRegion.SetSize ( Size );
+    CroppedRegion.SetIndex( Start );
+    CropImageFilter->SetRegionOfInterest( CroppedRegion );
+    try{ CropImageFilter->Update(); }
+    catch( itk::ExceptionObject & excp )
+    {
+      std::cerr <<  "Cropping image failed" << excp << std::endl;
+      return NULL;
+    }
+    returnImage->AppendChannelFromData3D( CropImageFilter->GetOutput()->GetBufferPointer(),
+    					  dataType, bpPix, Size[0], Size[1], Size[2],
+					  this->m_Info.channelNames.at(j),
+					  this->m_Info.channelColors.at(j), true );
+  }
+  
+
+  return returnImage;
+}
+
 }  // end namespace ftk
 #endif
