@@ -634,7 +634,7 @@ template <typename pixelType> ftk::Image::Pointer
     typename OutputImageType::IndexType Start;
     Start[0] = x1; Start[1] = y1; Start[2] = z1;
     typename OutputImageType::SizeType Size;
-    Size[0] = x2-x1; Size[1] = y2-y1; Size[2] = z2-z1;
+    Size[0] = x2-x1+1; Size[1] = y2-y1+1; Size[2] = z2-z1+1;
     CroppedRegion.SetSize ( Size );
     CroppedRegion.SetIndex( Start );
     CropImageFilter->SetRegionOfInterest( CroppedRegion );

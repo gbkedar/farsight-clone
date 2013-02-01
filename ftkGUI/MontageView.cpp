@@ -9,7 +9,8 @@ MontageView::MontageView( QWidget * parent )
   SubsampledImage = NULL;
   LabelImage = NULL;
   Table = NULL;
-  tree = NULL;
+  //tree = NULL;
+  XYIndList.clear();
   scaleFactor = DBL_MAX;
 
   chSignalMapper = NULL;
@@ -221,13 +222,15 @@ void MontageView::loadProject()
 
 void MontageView::IndexTable()
 {
+  //Change to tree
   if(!Table)
   {
     std::cerr<<"Could not load the table\n";
     return;
   }
+
   //We only need the x-y as the whole z-stack is used when cropping
-  SampleType::Pointer sample = SampleType::New();
+  /*SampleType::Pointer sample = SampleType::New();
   MeasurementVectorType mv;
 
   for( itk::SizeValueType i=0; i<Table->GetNumberOfRows(); ++i )
@@ -242,7 +245,22 @@ void MontageView::IndexTable()
   treeGenerator->SetSample( sample );
   treeGenerator->SetBucketSize( 10 );
   treeGenerator->Update();
-  tree = treeGenerator->GetOutput();
+  tree = treeGenerator->GetOutput();*/
+
+  XYIndList.clear();
+
+  for( itk::SizeValueType i=0; i<Table->GetNumberOfRows(); ++i )
+  {
+    TableEntryList mv;
+    mv.x      = Table->GetValueByName(i,"centroid_x").ToTypeUInt64();
+    mv.y      = Table->GetValueByName(i,"centroid_y").ToTypeUInt64();
+    mv.ImInd  = Table->GetValueByName(i,"ID").ToTypeUInt64();
+    mv.TabInd = i;
+    XYIndList.push_back( mv );
+  }
+  std::sort( XYIndList.begin(), XYIndList.end(),
+	boost::bind(&MontageView::TableEntryList::x , _1) <
+	boost::bind(&MontageView::TableEntryList::x , _2) );
 }
 
 void MontageView::cropRegion()
@@ -275,9 +293,54 @@ void MontageView::cropRegion()
     return;
   }
 
+  int bytePerPix = 1;
   //Crop channels
- // ftk::Image::Pointer cropChannelsImage = 
+  ftk::Image::Pointer CropChannel = Image->
+    CropImage<unsigned char>( x1, y1, z1, x2, y2, z2, itk::ImageIOBase::UCHAR, bytePerPix );
+   NucleusEditorLabelType::Pointer CropLabel;
 
+  if( LabelImage )
+  {
+    if( Image->IsMatch<unsigned short>( Image->GetImageInfo()->dataType ) )
+    {
+      bytePerPix = 2;
+      CropLabel = this->RelabelImage<unsigned short>(
+			LabelImage->CropImage<unsigned short>
+			( x1, y1, z1, x2, y2, z2, itk::ImageIOBase::USHORT, bytePerPix ) );
+    }
+    else if( Image->IsMatch<short>( Image->GetImageInfo()->dataType ) )
+    {
+      bytePerPix = 4;
+      CropLabel = this->RelabelImage<unsigned int>(
+			LabelImage->CropImage<unsigned int>
+			( x1, y1, z1, x2, y2, z2, itk::ImageIOBase::UINT, bytePerPix ) );
+    }
+  }
+#if 0
+  if( LabelImage )
+  {
+    typedef itk::ImageFileWriter< NucleusEditorLabelType > BinaryWriterType;
+    BinaryWriterType::Pointer binwriter = BinaryWriterType::New();
+    binwriter->SetInput( CropLabel );
+    std::string binWriterStr = "label_crop.tif";
+    binwriter->SetFileName( binWriterStr.c_str() );
+    try{ binwriter->Update(); }
+    catch( itk::ExceptionObject & excp ){ std::cerr << "Crop Label writer" << excp << std::endl; }
+  }
+
+  typedef itk::ImageFileWriter< itk::Image<unsigned char, 3> > BinaryWriterType1;
+  BinaryWriterType1::Pointer binwriter1 = BinaryWriterType1::New();
+  binwriter1->SetInput( CropChannel->GetItkPtr<unsigned char>( 0, 0) );
+  std::string binWriterStr1 = "channel0_crop.tif";
+  binwriter1->SetFileName( binWriterStr1.c_str() );
+  try{ binwriter1->Update(); }
+  catch( itk::ExceptionObject & excp )
+  {
+    std::cerr << "Crop Image writer" << 
+      CropChannel->GetImageInfo()->numColumns << "\t" <<
+      CropChannel->GetImageInfo()->numRows << excp << std::endl;
+  }
+#endif
 }
 
 //Take the maximum intensity projection and subsample each channel

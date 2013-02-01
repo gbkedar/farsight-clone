@@ -104,6 +104,7 @@ public:
 	  CropImage( itk::SizeValueType x1, itk::SizeValueType y1, itk::SizeValueType z1,
 	  	     itk::SizeValueType x2, itk::SizeValueType y2, itk::SizeValueType z2,
 		     DataType dataType, int bpPix );
+	template<typename pixelType1> bool IsMatch(DataType pixelType2);
 
 	typedef struct 
 	{
@@ -166,7 +167,6 @@ private:
 	DataType GetDataTypeITK(int vtk_type);
 
 	template<typename pType, typename rType> rType GetPixelValue(void * p);
-	template<typename pixelType1> bool IsMatch(DataType pixelType2);
 	template<typename pixelType> DataType GetDataType();
 
 	template<typename TPixel> bool WriteImageITK(itk::SizeValueType channel, std::string baseName, std::string ext);
