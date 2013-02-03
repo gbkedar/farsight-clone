@@ -206,7 +206,31 @@ void MontageView::loadProject()
     std::cerr<<"Could not load the label image. Table will not be loaded\n";
     if( Table )
       Table = NULL;
+    if( !BoundBoxes.empty() )
+      BoundBoxes.clear();
     return;
+  }
+
+  std::cout<<"Computing label stats for the label image\n";
+
+  LabelStatisticsImageFilterType::Pointer LabelStats = LabelStatisticsImageFilterType::New();
+  LabelStats->SetLabelInput( LabelImage->GetItkPtr<unsigned int>(0,0) );
+  LabelStats->UseHistogramsOff();
+
+  try
+  {
+    LabelStats->Update();
+  }
+  catch( itk::ExceptionObject & excp )
+  {
+    std::cerr << "Error in Label Image stats" << excp << std::endl;
+  }
+  for( LabelStatisticsImageFilterType::ValidLabelValuesContainerType::const_iterator
+	  it = LabelStats->GetValidLabelValues().begin();
+	it != LabelStats->GetValidLabelValues().end(); ++it )
+  {
+    LabelStatisticsImageFilterType::BoundingBoxType bb = LabelStats->GetBoundingBox( *it );
+    BoundBoxes.push_back( bb );
   }
 
   Table = ftk::LoadTable( projectFiles.GetFullTable() );
@@ -258,9 +282,7 @@ void MontageView::IndexTable()
     mv.TabInd = i;
     XYIndList.push_back( mv );
   }
-  std::sort( XYIndList.begin(), XYIndList.end(),
-	boost::bind(&MontageView::TableEntryList::x , _1) <
-	boost::bind(&MontageView::TableEntryList::x , _2) );
+  std::sort( XYIndList.begin(), XYIndList.end(), MontageView::TableEntryComparator() );
 }
 
 void MontageView::cropRegion()
@@ -297,8 +319,15 @@ void MontageView::cropRegion()
   //Crop channels
   ftk::Image::Pointer CropChannel = Image->
     CropImage<unsigned char>( x1, y1, z1, x2, y2, z2, itk::ImageIOBase::UCHAR, bytePerPix );
-   NucleusEditorLabelType::Pointer CropLabel;
 
+  NucleusEditorLabelType::Pointer CropLabel = NULL;
+  vtkSmartPointer<vtkTable> CropTable = NULL;
+
+  //Check if there are any labels and if there are get their table entries
+  if( Table )
+  {
+    CropTable = this->GetCroppedTable( x1, y1, x2, y2 );
+  }
   if( LabelImage )
   {
     if( Image->IsMatch<unsigned short>( Image->GetImageInfo()->dataType ) )
@@ -315,6 +344,7 @@ void MontageView::cropRegion()
 			LabelImage->CropImage<unsigned int>
 			( x1, y1, z1, x2, y2, z2, itk::ImageIOBase::UINT, bytePerPix ) );
     }
+     
   }
 #if 0
   if( LabelImage )
@@ -341,6 +371,48 @@ void MontageView::cropRegion()
       CropChannel->GetImageInfo()->numRows << excp << std::endl;
   }
 #endif
+
+}
+vtkSmartPointer<vtkTable> MontageView::GetCroppedTable( itk::SizeValueType x1, itk::SizeValueType y1,
+						itk::SizeValueType x2, itk::SizeValueType y2 )
+{
+  if( x1<XYIndList.front().x && x2<XYIndList.front().x )
+    return NULL;
+  if( x1>XYIndList.back().x )
+    return NULL;
+  //Get the pointer to the element with first element with x in [x1,x2]
+  std::vector< TableEntryList >::iterator it1, it2;
+  if( x1<=XYIndList.front().x )
+    it1 = XYIndList.begin();
+  else
+  {
+    it1 = std::upper_bound( XYIndList.begin(), XYIndList.end(), (x1-1), MontageView::TableEntryComparator() );
+    ++it1;
+  }
+
+  if( x2>=XYIndList.back().x )
+    it2 = XYIndList.end();
+  else
+    it2 = std::upper_bound( it1, XYIndList.end(), x2, MontageView::TableEntryComparator() );
+
+  itk::SizeValueType LowIndex, HighIndex, ObjectCount=0;
+  LowIndex  = std::distance(XYIndList.begin(), it1);
+  HighIndex = LowIndex + std::distance(it1, it2);
+
+  //Get row ids for the cells in the area that is selected
+#ifdef _OPENMP
+#pragma omp parallel for
+#if _OPENMP < 200805L
+  for( long i=LowIndex,; i<=HighIndex; ++i )
+#else
+  for( itk::SizeValueType i=LowIndex; i<=HighIndex; ++i )
+#endif
+#else
+  for( itk::SizeValueType i=LowIndex; i<=HighIndex; ++i )
+#endif
+  {
+    ;
+  }
 }
 
 //Take the maximum intensity projection and subsample each channel
@@ -392,9 +464,7 @@ void MontageView::resetSubsampledImageAndDisplayImage()
       currentChannelProjection = MaxProjectFilter->GetOutput();
     }
     else
-    {
       currentChannelProjection = currentChannel;
-    }
 
     scaleFactor = imInfo->numColumns > imInfo->numRows ? imInfo->numColumns : imInfo->numRows ;
     scaleFactor = scaleFactor/1000.0;

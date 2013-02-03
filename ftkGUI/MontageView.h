@@ -20,6 +20,7 @@
 #include "itkCastImageFilter.h"
 #include "itkRecursiveGaussianImageFilter.h"
 #include "itkRelabelComponentImageFilter.h"
+#include "itkLabelStatisticsImageFilter.h"
 #include "itkResampleImageFilter.h"
 #include "itkKdTreeGenerator.h"
 
@@ -43,6 +44,14 @@ public:
   struct TableEntryList{
     itk::SizeValueType x, y, ImInd, TabInd;
   };
+  struct TableEntryComparator
+  {  bool operator()( const TableEntryList& t, itk::SizeValueType Value ) const
+     { return t.x < Value; }
+     bool operator()( itk::SizeValueType Value, const TableEntryList& t ) const
+     { return Value < t.x; }
+     bool operator()( const TableEntryList& t1, const TableEntryList& t2 ) const
+     { return t1.x < t2.x; }
+  };
 
 //private:
 
@@ -54,16 +63,17 @@ protected slots:
   void loadProject(void);
   void askLoadImage(void);
   void DisplayChannelsMenu(void);
-  void cropRegion(void);
   void toggleChannel(int chNum);
   bool loadImage(QString fileName);
   void resetSubsampledImageAndDisplayImage(void);
   void SetChannelImage(void);
   void enableRegionSelButton(bool);
-  void IndexTable(void);
 
 private:
   typedef itk::Image<unsigned short, 3> NucleusEditorLabelType;
+  typedef itk::Image<unsigned int,   3> LabelUnsignedIntType;
+  typedef itk::LabelStatisticsImageFilter
+    < LabelUnsignedIntType, LabelUnsignedIntType > LabelStatisticsImageFilterType;
   /*typedef itk::Vector< float, 2 > MeasurementVectorType;
   typedef itk::Statistics::ListSample< MeasurementVectorType > SampleType;
   typedef itk::Statistics::KdTreeGenerator< SampleType > TreeGeneratorType;
@@ -81,6 +91,13 @@ private:
   template<typename pixelType> NucleusEditorLabelType::Pointer
   				RelabelImage(ftk::Image::Pointer InputImage);
   std::vector< TableEntryList > XYIndList;
+  std::vector< LabelStatisticsImageFilterType::BoundingBoxType > BoundBoxes;
+
+  //Utility functions
+  void IndexTable(void);
+  void cropRegion(void);
+  vtkSmartPointer<vtkTable> GetCroppedTable( itk::SizeValueType x1, itk::SizeValueType y1,
+					itk::SizeValueType x2, itk::SizeValueType y2 );
 
 signals:
 protected:
