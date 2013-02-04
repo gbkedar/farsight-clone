@@ -10,8 +10,9 @@ MontageView::MontageView( QWidget * parent )
   LabelImage = NULL;
   Table = NULL;
   //tree = NULL;
-  XYIndList.clear();
+  TableEntryVector.clear();
   scaleFactor = DBL_MAX;
+  NumberOfLabelsFound = 0;
 
   chSignalMapper = NULL;
 
@@ -190,6 +191,8 @@ void MontageView::loadProject()
 
   projectDefinition.Load( projectFiles.GetFullDef() );
 
+  TableEntryVector.clear();
+
   QString labelName = QString::fromStdString( projectFiles.GetFullOutput() );
   QString myExt = QFileInfo( labelName ).suffix();
   if( myExt == "xml")
@@ -206,8 +209,8 @@ void MontageView::loadProject()
     std::cerr<<"Could not load the label image. Table will not be loaded\n";
     if( Table )
       Table = NULL;
-    if( !BoundBoxes.empty() )
-      BoundBoxes.clear();
+    if( !TableEntryVector.empty() )
+      TableEntryVector.clear();
     return;
   }
 
@@ -230,59 +233,48 @@ void MontageView::loadProject()
 	it != LabelStats->GetValidLabelValues().end(); ++it )
   {
     LabelStatisticsImageFilterType::BoundingBoxType bb = LabelStats->GetBoundingBox( *it );
-    BoundBoxes.push_back( bb );
+    TableEntryList CurrentEntry;
+    CurrentEntry.BoundBox = bb;
+    CurrentEntry.LabelImId = *it;
+    TableEntryVector.push_back( CurrentEntry );
   }
 
   Table = ftk::LoadTable( projectFiles.GetFullTable() );
-  if(!Table)
+  if( !Table || ( Table->GetNumberOfRows() != TableEntryVector.size() ) )
   {
-    std::cerr<<"Could not load the table\n";
+    if( Table->GetNumberOfRows() != TableEntryVector.size() )
+      std::cerr<< "The label image and the table do not have the same number of IDs\n"
+		<< Table->GetNumberOfRows() << " rows, " << TableEntryVector.size()
+		<< " labels\n";
+    else
+      std::cerr<< "No Table Loaded\n";
+    std::cerr<< "Setting Label Image and Table to NULL\n";
+    Table = NULL;
+    LabelImage =NULL;
+    if( !TableEntryVector.empty() )
+      TableEntryVector.clear();
     return;
   }
 
-  this->IndexTable();
-
-}
-
-void MontageView::IndexTable()
-{
-  //Change to tree
-  if(!Table)
-  {
-    std::cerr<<"Could not load the table\n";
-    return;
-  }
-
-  //We only need the x-y as the whole z-stack is used when cropping
-  /*SampleType::Pointer sample = SampleType::New();
-  MeasurementVectorType mv;
-
   for( itk::SizeValueType i=0; i<Table->GetNumberOfRows(); ++i )
   {
-    mv[0] = Table->GetValueByName(i,"centroid_x").ToDouble();
-    mv[1] = Table->GetValueByName(i,"centroid_y").ToDouble();
-    sample->PushBack( mv );
+    itk::SizeValueType x,y,z,id;
+    x  = Table->GetValueByName(i,"centroid_x").ToTypeUInt64();
+    y  = Table->GetValueByName(i,"centroid_y").ToTypeUInt64();
+    z  = Table->GetValueByName(i,"centroid_z").ToTypeUInt64();
+    id = Table->GetValueByName(i,"ID").ToTypeUInt64();
+    if(!(x>=TableEntryVector.at(i).BoundBox.at(0) && x<=TableEntryVector.at(i).BoundBox.at(1)
+      && y>=TableEntryVector.at(i).BoundBox.at(2) && y<=TableEntryVector.at(i).BoundBox.at(3)
+      && z>=TableEntryVector.at(i).BoundBox.at(4) && z<=TableEntryVector.at(i).BoundBox.at(5) ) )
+      std::cerr<< "The centroid in the table and label image don't match for id "<<id
+		<<" Nucleus editor may crash if you click on this cell\n";
+    if( id!=TableEntryVector.at(i).LabelImId )
+      std::cerr<< "The ids don't match for label "<<TableEntryVector.at(i).LabelImId
+		<< "and table entry number " << i
+		<<" Nucleus editor may crash if you click on this cell\n";
+    TableEntryVector.at(i).TabInd = i;
   }
-  typedef itk::Statistics::KdTreeGenerator< SampleType > TreeGeneratorType;
-  TreeGeneratorType::Pointer treeGenerator = TreeGeneratorType::New();
-
-  treeGenerator->SetSample( sample );
-  treeGenerator->SetBucketSize( 10 );
-  treeGenerator->Update();
-  tree = treeGenerator->GetOutput();*/
-
-  XYIndList.clear();
-
-  for( itk::SizeValueType i=0; i<Table->GetNumberOfRows(); ++i )
-  {
-    TableEntryList mv;
-    mv.x      = Table->GetValueByName(i,"centroid_x").ToTypeUInt64();
-    mv.y      = Table->GetValueByName(i,"centroid_y").ToTypeUInt64();
-    mv.ImInd  = Table->GetValueByName(i,"ID").ToTypeUInt64();
-    mv.TabInd = i;
-    XYIndList.push_back( mv );
-  }
-  std::sort( XYIndList.begin(), XYIndList.end(), MontageView::TableEntryComparator() );
+  std::sort( TableEntryVector.begin(), TableEntryVector.end(), MontageView::TableEntryComparator() );
 }
 
 void MontageView::cropRegion()
@@ -324,10 +316,6 @@ void MontageView::cropRegion()
   vtkSmartPointer<vtkTable> CropTable = NULL;
 
   //Check if there are any labels and if there are get their table entries
-  if( Table )
-  {
-    CropTable = this->GetCroppedTable( x1, y1, x2, y2 );
-  }
   if( LabelImage )
   {
     if( Image->IsMatch<unsigned short>( Image->GetImageInfo()->dataType ) )
@@ -345,6 +333,10 @@ void MontageView::cropRegion()
 			( x1, y1, z1, x2, y2, z2, itk::ImageIOBase::UINT, bytePerPix ) );
     }
      
+  }
+  if( NumberOfLabelsFound && Table )
+  {
+    CropTable = this->GetCroppedTable( x1, y1, x2, y2, CropLabel );
   }
 #if 0
   if( LabelImage )
@@ -374,44 +366,41 @@ void MontageView::cropRegion()
 
 }
 vtkSmartPointer<vtkTable> MontageView::GetCroppedTable( itk::SizeValueType x1, itk::SizeValueType y1,
-						itk::SizeValueType x2, itk::SizeValueType y2 )
+		itk::SizeValueType x2, itk::SizeValueType y2, NucleusEditorLabelType::Pointer CropLabel )
 {
-  if( x1<XYIndList.front().x && x2<XYIndList.front().x )
+  //Check if region has any labels
+  if( x1<TableEntryVector.front().BoundBox.at(0) && x2<TableEntryVector.front().BoundBox.at(0) )
     return NULL;
-  if( x1>XYIndList.back().x )
+  if( x1>TableEntryVector.back().BoundBox.at(0) )
     return NULL;
   //Get the pointer to the element with first element with x in [x1,x2]
   std::vector< TableEntryList >::iterator it1, it2;
-  if( x1<=XYIndList.front().x )
-    it1 = XYIndList.begin();
+  if( x1<=TableEntryVector.front().BoundBox.at(0) )
+    it1 = TableEntryVector.begin();
   else
   {
-    it1 = std::upper_bound( XYIndList.begin(), XYIndList.end(), (x1-1), MontageView::TableEntryComparator() );
+    it1 = std::upper_bound( TableEntryVector.begin(), TableEntryVector.end(),
+    				(x1-1), MontageView::TableEntryComparator() );
     ++it1;
   }
 
-  if( x2>=XYIndList.back().x )
-    it2 = XYIndList.end();
+  if( x2>=TableEntryVector.back().BoundBox.at(0) )
+    it2 = TableEntryVector.end();
   else
-    it2 = std::upper_bound( it1, XYIndList.end(), x2, MontageView::TableEntryComparator() );
+    it2 = std::upper_bound( it1, TableEntryVector.end(), x2, MontageView::TableEntryComparator() );
 
   itk::SizeValueType LowIndex, HighIndex, ObjectCount=0;
-  LowIndex  = std::distance(XYIndList.begin(), it1);
+  LowIndex  = std::distance(TableEntryVector.begin(), it1);
   HighIndex = LowIndex + std::distance(it1, it2);
 
+  std::vector<TableEntryList> OutLabels;
+
   //Get row ids for the cells in the area that is selected
-#ifdef _OPENMP
-#pragma omp parallel for
-#if _OPENMP < 200805L
-  for( long i=LowIndex,; i<=HighIndex; ++i )
-#else
   for( itk::SizeValueType i=LowIndex; i<=HighIndex; ++i )
-#endif
-#else
-  for( itk::SizeValueType i=LowIndex; i<=HighIndex; ++i )
-#endif
   {
-    ;
+    if( TableEntryVector.at(i).BoundBox.at(0)>y1 && TableEntryVector.at(i).BoundBox.at(0)<y2 ||
+	TableEntryVector.at(i).BoundBox.at(0)>y1 && TableEntryVector.at(i).BoundBox.at(0)<y2 )
+      OutLabels.push_back(TableEntryVector.at(i));
   }
 }
 

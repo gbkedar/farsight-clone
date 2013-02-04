@@ -41,16 +41,32 @@ public:
   MontageView(QWidget * parent = 0);
   ~MontageView();
   void Initialize();
+
+private:
+  typedef itk::Image<unsigned short, 3> NucleusEditorLabelType;
+  typedef itk::Image<unsigned int,   3> LabelUnsignedIntType;
+  typedef itk::LabelStatisticsImageFilter
+    < LabelUnsignedIntType, LabelUnsignedIntType > LabelStatisticsImageFilterType;
+  /*typedef itk::Vector< float, 2 > MeasurementVectorType;
+  typedef itk::Statistics::ListSample< MeasurementVectorType > SampleType;
+  typedef itk::Statistics::KdTreeGenerator< SampleType > TreeGeneratorType;
+  typedef TreeGeneratorType::KdTreeType TreeType;
+  TreeType::Pointer tree;		//Should switch Faster indexing of the table*/
+
+public:
   struct TableEntryList{
-    itk::SizeValueType x, y, ImInd, TabInd;
+    itk::SizeValueType LabelImId, TabInd;
+    LabelStatisticsImageFilterType::BoundingBoxType BoundBox;
   };
   struct TableEntryComparator
   {  bool operator()( const TableEntryList& t, itk::SizeValueType Value ) const
-     { return t.x < Value; }
+     { return t.BoundBox.at(0) < Value; }
      bool operator()( itk::SizeValueType Value, const TableEntryList& t ) const
-     { return Value < t.x; }
+     { return Value < t.BoundBox.at(0); }
+     //Following operator:Indexing table and image initiall-->Can afford to be inefficient
      bool operator()( const TableEntryList& t1, const TableEntryList& t2 ) const
-     { return t1.x < t2.x; }
+     { if( t1.BoundBox.at(0) == t2.BoundBox.at(0) ) return t1.BoundBox.at(1) < t2.BoundBox.at(2);
+       return t1.BoundBox.at(0) < t2.BoundBox.at(0); }
   };
 
 //private:
@@ -70,15 +86,6 @@ protected slots:
   void enableRegionSelButton(bool);
 
 private:
-  typedef itk::Image<unsigned short, 3> NucleusEditorLabelType;
-  typedef itk::Image<unsigned int,   3> LabelUnsignedIntType;
-  typedef itk::LabelStatisticsImageFilter
-    < LabelUnsignedIntType, LabelUnsignedIntType > LabelStatisticsImageFilterType;
-  /*typedef itk::Vector< float, 2 > MeasurementVectorType;
-  typedef itk::Statistics::ListSample< MeasurementVectorType > SampleType;
-  typedef itk::Statistics::KdTreeGenerator< SampleType > TreeGeneratorType;
-  typedef TreeGeneratorType::KdTreeType TreeType;
-  TreeType::Pointer tree;				//Fast indexing of the table*/
 
   ftk::Image::Pointer Image;
   ftk::Image::Pointer SubsampledImage;
@@ -87,17 +94,16 @@ private:
   ftk::ProjectFiles projectFiles;			//files in the currently visible project
   ftk::ProjectDefinition projectDefinition;		//the project definition currently being used.
   double scaleFactor;
+  itk::SizeValueType NumberOfLabelsFound;
 
   template<typename pixelType> NucleusEditorLabelType::Pointer
   				RelabelImage(ftk::Image::Pointer InputImage);
-  std::vector< TableEntryList > XYIndList;
-  std::vector< LabelStatisticsImageFilterType::BoundingBoxType > BoundBoxes;
+  std::vector< TableEntryList > TableEntryVector;
 
   //Utility functions
-  void IndexTable(void);
   void cropRegion(void);
   vtkSmartPointer<vtkTable> GetCroppedTable( itk::SizeValueType x1, itk::SizeValueType y1,
-					itk::SizeValueType x2, itk::SizeValueType y2 );
+	itk::SizeValueType x2, itk::SizeValueType y2, NucleusEditorLabelType::Pointer CropLabel );
 
 signals:
 protected:
