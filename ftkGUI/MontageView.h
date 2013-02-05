@@ -19,10 +19,9 @@
 #include "itkAdaptiveHistogramEqualizationImageFilter.h"
 #include "itkCastImageFilter.h"
 #include "itkRecursiveGaussianImageFilter.h"
-#include "itkRelabelComponentImageFilter.h"
 #include "itkLabelStatisticsImageFilter.h"
 #include "itkResampleImageFilter.h"
-#include "itkKdTreeGenerator.h"
+//#include "itkKdTreeGenerator.h"
 
 #include "MontageDiplayArea.h"
 
@@ -43,33 +42,21 @@ public:
   void Initialize();
 
 private:
-  typedef itk::Image<unsigned short, 3> NucleusEditorLabelType;
-  typedef itk::Image<unsigned int,   3> LabelUnsignedIntType;
-  typedef itk::LabelStatisticsImageFilter
-    < LabelUnsignedIntType, LabelUnsignedIntType > LabelStatisticsImageFilterType;
-  /*typedef itk::Vector< float, 2 > MeasurementVectorType;
-  typedef itk::Statistics::ListSample< MeasurementVectorType > SampleType;
-  typedef itk::Statistics::KdTreeGenerator< SampleType > TreeGeneratorType;
-  typedef TreeGeneratorType::KdTreeType TreeType;
-  TreeType::Pointer tree;		//Should switch Faster indexing of the table*/
 
 public:
   struct TableEntryList{
-    itk::SizeValueType LabelImId, TabInd;
-    LabelStatisticsImageFilterType::BoundingBoxType BoundBox;
+    itk::SizeValueType x, y, LabelImId, TabInd;
   };
   struct TableEntryComparator
   {  bool operator()( const TableEntryList& t, itk::SizeValueType Value ) const
-     { return t.BoundBox.at(0) < Value; }
+     { return t.x < Value; }
      bool operator()( itk::SizeValueType Value, const TableEntryList& t ) const
-     { return Value < t.BoundBox.at(0); }
+     { return Value < t.x; }
      //Following operator:Indexing table and image initiall-->Can afford to be inefficient
      bool operator()( const TableEntryList& t1, const TableEntryList& t2 ) const
-     { if( t1.BoundBox.at(0) == t2.BoundBox.at(0) ) return t1.BoundBox.at(1) < t2.BoundBox.at(2);
-       return t1.BoundBox.at(0) < t2.BoundBox.at(0); }
+     { if( t1.x == t2.x ) return t1.y < t2.y;
+       else return t1.x < t2.x; }
   };
-
-//private:
 
 protected:
   virtual void closeEvent(QCloseEvent *event);
@@ -86,6 +73,15 @@ protected slots:
   void enableRegionSelButton(bool);
 
 private:
+  typedef itk::Image<unsigned short, 3> NucleusEditorLabelType;
+  typedef itk::Image<unsigned int,   3> LabelUnsignedIntType;
+  typedef itk::LabelStatisticsImageFilter
+    < LabelUnsignedIntType, LabelUnsignedIntType > LabelStatisticsImageFilterType;
+  /*typedef itk::Vector< float, 2 > MeasurementVectorType;
+  typedef itk::Statistics::ListSample< MeasurementVectorType > SampleType;
+  typedef itk::Statistics::KdTreeGenerator< SampleType > TreeGeneratorType;
+  typedef TreeGeneratorType::KdTreeType TreeType;
+  TreeType::Pointer tree;		//Should switch Faster indexing of the table*/
 
   ftk::Image::Pointer Image;
   ftk::Image::Pointer SubsampledImage;
@@ -99,11 +95,15 @@ private:
   template<typename pixelType> NucleusEditorLabelType::Pointer
   				RelabelImage(ftk::Image::Pointer InputImage);
   std::vector< TableEntryList > TableEntryVector;
+  std::vector< LabelStatisticsImageFilterType::BoundingBoxType > BoundingBoxes;
+  std::map< itk::SizeValueType, itk::SizeValueType > LabelToTableMap;
+  std::map< itk::SizeValueType, itk::SizeValueType > LabelToRelabelMap;
 
   //Utility functions
   void cropRegion(void);
   vtkSmartPointer<vtkTable> GetCroppedTable( itk::SizeValueType x1, itk::SizeValueType y1,
-	itk::SizeValueType x2, itk::SizeValueType y2, NucleusEditorLabelType::Pointer CropLabel );
+	itk::SizeValueType x2, itk::SizeValueType y2 );
+  itk::SizeValueType InsertNewLabelToRelabelMap( itk::SizeValueType NewKey );
 
 signals:
 protected:

@@ -11,6 +11,9 @@ MontageView::MontageView( QWidget * parent )
   Table = NULL;
   //tree = NULL;
   TableEntryVector.clear();
+  BoundingBoxes.clear();
+  LabelToRelabelMap.clear();
+  LabelToTableMap.clear();
   scaleFactor = DBL_MAX;
   NumberOfLabelsFound = 0;
 
@@ -192,6 +195,8 @@ void MontageView::loadProject()
   projectDefinition.Load( projectFiles.GetFullDef() );
 
   TableEntryVector.clear();
+  BoundingBoxes.clear();
+  LabelToTableMap.clear();
 
   QString labelName = QString::fromStdString( projectFiles.GetFullOutput() );
   QString myExt = QFileInfo( labelName ).suffix();
@@ -209,8 +214,6 @@ void MontageView::loadProject()
     std::cerr<<"Could not load the label image. Table will not be loaded\n";
     if( Table )
       Table = NULL;
-    if( !TableEntryVector.empty() )
-      TableEntryVector.clear();
     return;
   }
 
@@ -233,46 +236,46 @@ void MontageView::loadProject()
 	it != LabelStats->GetValidLabelValues().end(); ++it )
   {
     LabelStatisticsImageFilterType::BoundingBoxType bb = LabelStats->GetBoundingBox( *it );
-    TableEntryList CurrentEntry;
-    CurrentEntry.BoundBox = bb;
-    CurrentEntry.LabelImId = *it;
-    TableEntryVector.push_back( CurrentEntry );
+    BoundingBoxes.push_back( bb );
   }
 
   Table = ftk::LoadTable( projectFiles.GetFullTable() );
-  if( !Table || ( Table->GetNumberOfRows() != TableEntryVector.size() ) )
+  if( !Table || ( Table->GetNumberOfRows() != BoundingBoxes.size() ) )
   {
-    if( Table->GetNumberOfRows() != TableEntryVector.size() )
+    if( Table->GetNumberOfRows() != BoundingBoxes.size() )
       std::cerr<< "The label image and the table do not have the same number of IDs\n"
-		<< Table->GetNumberOfRows() << " rows, " << TableEntryVector.size()
+		<< Table->GetNumberOfRows() << " rows, " << BoundingBoxes.size()
 		<< " labels\n";
     else
       std::cerr<< "No Table Loaded\n";
     std::cerr<< "Setting Label Image and Table to NULL\n";
     Table = NULL;
     LabelImage =NULL;
-    if( !TableEntryVector.empty() )
-      TableEntryVector.clear();
+    if( !BoundingBoxes.empty() )
+      BoundingBoxes.clear();
     return;
   }
 
   for( itk::SizeValueType i=0; i<Table->GetNumberOfRows(); ++i )
   {
-    itk::SizeValueType x,y,z,id;
-    x  = Table->GetValueByName(i,"centroid_x").ToTypeUInt64();
-    y  = Table->GetValueByName(i,"centroid_y").ToTypeUInt64();
-    z  = Table->GetValueByName(i,"centroid_z").ToTypeUInt64();
-    id = Table->GetValueByName(i,"ID").ToTypeUInt64();
-    if(!(x>=TableEntryVector.at(i).BoundBox.at(0) && x<=TableEntryVector.at(i).BoundBox.at(1)
-      && y>=TableEntryVector.at(i).BoundBox.at(2) && y<=TableEntryVector.at(i).BoundBox.at(3)
-      && z>=TableEntryVector.at(i).BoundBox.at(4) && z<=TableEntryVector.at(i).BoundBox.at(5) ) )
-      std::cerr<< "The centroid in the table and label image don't match for id "<<id
+    TableEntryList CurrentEntry;
+    CurrentEntry.x  = Table->GetValueByName(i,"centroid_x").ToTypeUInt64();
+    CurrentEntry.y  = Table->GetValueByName(i,"centroid_y").ToTypeUInt64();
+    itk::SizeValueType z  = Table->GetValueByName(i,"centroid_z").ToTypeUInt64();
+    CurrentEntry.LabelImId = Table->GetValueByName(i,"ID").ToTypeUInt64();
+    if(!(CurrentEntry.x>=BoundingBoxes.at(i).at(0) && CurrentEntry.x<=BoundingBoxes.at(i).at(1)
+      && CurrentEntry.y>=BoundingBoxes.at(i).at(2) && CurrentEntry.y<=BoundingBoxes.at(i).at(3)
+      && z>=BoundingBoxes.at(i).at(4) && z<=BoundingBoxes.at(i).at(5) ) )
+      std::cerr<< i << "The centroid in the table and label image don't match for id "<< CurrentEntry.LabelImId
 		<<" Nucleus editor may crash if you click on this cell\n";
-    if( id!=TableEntryVector.at(i).LabelImId )
-      std::cerr<< "The ids don't match for label "<<TableEntryVector.at(i).LabelImId
-		<< "and table entry number " << i
+    if( LabelStats->GetValidLabelValues().at(i)!=CurrentEntry.LabelImId )
+      std::cerr<< LabelStats->GetValidLabelValues().at(i) << "The ids don't match for label " 
+		<< CurrentEntry.LabelImId << "and table entry number " << i
 		<<" Nucleus editor may crash if you click on this cell\n";
-    TableEntryVector.at(i).TabInd = i;
+    CurrentEntry.TabInd = i;
+    TableEntryVector.push_back( CurrentEntry );
+    LabelToTableMap.insert(std::map<itk::SizeValueType, itk::SizeValueType>::value_type
+    				( CurrentEntry.LabelImId, i ) );
   }
   std::sort( TableEntryVector.begin(), TableEntryVector.end(), MontageView::TableEntryComparator() );
 }
@@ -314,6 +317,7 @@ void MontageView::cropRegion()
 
   NucleusEditorLabelType::Pointer CropLabel = NULL;
   vtkSmartPointer<vtkTable> CropTable = NULL;
+  LabelToRelabelMap.clear();
 
   //Check if there are any labels and if there are get their table entries
   if( LabelImage )
@@ -332,11 +336,10 @@ void MontageView::cropRegion()
 			LabelImage->CropImage<unsigned int>
 			( x1, y1, z1, x2, y2, z2, itk::ImageIOBase::UINT, bytePerPix ) );
     }
-     
   }
   if( NumberOfLabelsFound && Table )
   {
-    CropTable = this->GetCroppedTable( x1, y1, x2, y2, CropLabel );
+    CropTable = this->GetCroppedTable( x1, y1, x2, y2 );
   }
 #if 0
   if( LabelImage )
@@ -363,45 +366,57 @@ void MontageView::cropRegion()
       CropChannel->GetImageInfo()->numRows << excp << std::endl;
   }
 #endif
-
 }
+
 vtkSmartPointer<vtkTable> MontageView::GetCroppedTable( itk::SizeValueType x1, itk::SizeValueType y1,
-		itk::SizeValueType x2, itk::SizeValueType y2, NucleusEditorLabelType::Pointer CropLabel )
+		itk::SizeValueType x2, itk::SizeValueType y2 )
 {
-  //Check if region has any labels
-  if( x1<TableEntryVector.front().BoundBox.at(0) && x2<TableEntryVector.front().BoundBox.at(0) )
-    return NULL;
-  if( x1>TableEntryVector.back().BoundBox.at(0) )
-    return NULL;
-  //Get the pointer to the element with first element with x in [x1,x2]
-  std::vector< TableEntryList >::iterator it1, it2;
-  if( x1<=TableEntryVector.front().BoundBox.at(0) )
-    it1 = TableEntryVector.begin();
-  else
+  vtkSmartPointer<vtkTable> cropTable = vtkSmartPointer<vtkTable>::New();
+  for( vtkIdType i = 0; Table->GetNumberOfColumns(); ++i )
   {
-    it1 = std::upper_bound( TableEntryVector.begin(), TableEntryVector.end(),
-    				(x1-1), MontageView::TableEntryComparator() );
-    ++it1;
+    vtkSmartPointer<vtkDoubleArray> column = vtkSmartPointer<vtkDoubleArray>::New();
+    column->SetName( Table->GetColumnName(i) );
   }
 
-  if( x2>=TableEntryVector.back().BoundBox.at(0) )
-    it2 = TableEntryVector.end();
-  else
-    it2 = std::upper_bound( it1, TableEntryVector.end(), x2, MontageView::TableEntryComparator() );
-
-  itk::SizeValueType LowIndex, HighIndex, ObjectCount=0;
-  LowIndex  = std::distance(TableEntryVector.begin(), it1);
-  HighIndex = LowIndex + std::distance(it1, it2);
-
-  std::vector<TableEntryList> OutLabels;
-
-  //Get row ids for the cells in the area that is selected
-  for( itk::SizeValueType i=LowIndex; i<=HighIndex; ++i )
+  for( std::map< itk::SizeValueType , itk::SizeValueType >::iterator it = LabelToRelabelMap.begin();
+	it != LabelToRelabelMap.end(); ++it )
   {
-    if( TableEntryVector.at(i).BoundBox.at(0)>y1 && TableEntryVector.at(i).BoundBox.at(0)<y2 ||
-	TableEntryVector.at(i).BoundBox.at(0)>y1 && TableEntryVector.at(i).BoundBox.at(0)<y2 )
-      OutLabels.push_back(TableEntryVector.at(i));
+    vtkSmartPointer<vtkVariantArray> row = vtkSmartPointer<vtkVariantArray>::New();
+    std::map< itk::SizeValueType , itk::SizeValueType >::iterator it1;
+    it1 = LabelToTableMap.find( it->first );
+    if( it1!=LabelToTableMap.end() )
+    {
+      row->DeepCopy( Table->GetRow( it1->second ) );
+      cropTable->InsertNextRow( row );    
+    }
+    else
+    {
+      std::cerr << it->second << " has no table entry. Nucleus Editor will crash if you click on it.\n";
+    }
   }
+
+  std::map< itk::SizeValueType , itk::SizeValueType >::iterator it = LabelToRelabelMap.begin();
+#ifdef _OPENMP
+  #pragma omp parallel for
+#endif
+  for( vtkIdType i=0; i<cropTable->GetNumberOfRows(); ++i )
+  {
+    cropTable->SetValue(i,0,i+1);
+    std::map< itk::SizeValueType , itk::SizeValueType >::iterator it1;
+    it1 = LabelToTableMap.find( it->first );
+    itk::SizeValueType x = TableEntryVector.at( it1->second ).x;
+    if( x<x1 ) x = 0;
+    else if( x>x2 ) x = x2-x1-1;
+    else x -= x1;
+    cropTable->SetValueByName( i, "centroid_x", x );
+    itk::SizeValueType y = TableEntryVector.at( it1->second ).y;
+    if( y<y1 ) y = 0;
+    else if( y>y2 ) y = y2-y1-1;
+    else y -= y1;
+    cropTable->SetValueByName( i, "centroid_y", y );
+    ++it;
+  }
+  return cropTable;
 }
 
 //Take the maximum intensity projection and subsample each channel
@@ -550,4 +565,24 @@ void MontageView::toggleChannel( int chNum )
 	std::vector<bool> ch_stats = imageViewer->GetChannelFlags();
 	ch_stats[chNum] = !ch_stats[chNum];
 	imageViewer->SetChannelFlags( ch_stats );
+}
+
+itk::SizeValueType MontageView::InsertNewLabelToRelabelMap( itk::SizeValueType NewKey )
+{
+  if( LabelToRelabelMap.empty() )
+  {
+    LabelToRelabelMap.insert( std::map<itk::SizeValueType, itk::SizeValueType>::value_type
+				( NewKey, 1 ) );
+    return 1;
+  }
+  //Just in case another thread has inserted a key
+#ifdef _OPENMP
+  std::map< itk::SizeValueType , itk::SizeValueType >::iterator it;
+  it = LabelToRelabelMap.find( NewKey );
+  if( it!=LabelToRelabelMap.end() )
+    return it->second;
+#endif
+  LabelToRelabelMap.insert( std::map<itk::SizeValueType, itk::SizeValueType>::value_type
+    				( NewKey, (LabelToRelabelMap.size()+1) ) );
+  return LabelToRelabelMap.size();
 }
