@@ -56,6 +56,7 @@
 #ifdef PROJPROC_WITH_MONT_SEG
 #include "boost/filesystem/path.hpp"
 #include "boost/filesystem/operations.hpp"
+#include "boost/lexical_cast.hpp"
 #endif //PROJPROC_WITH_MONT_SEG
 
 namespace ftk

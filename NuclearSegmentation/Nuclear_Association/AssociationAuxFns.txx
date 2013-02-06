@@ -132,6 +132,7 @@ std::vector<float> compute_ec_features( typename itk::SmartPointer<InputImageTyp
 		std::vector< typename LabelImageType::IndexType > LabelIndices;
 		itk::SizeValueType pixel_count=0;
 		for ( PixBuf.GoToBegin(); !PixBuf.IsAtEnd(); ++PixBuf )
+		{
 			if( PixBuf.Get() == LabelIndex )
 			{
 				typename LabelImageType::IndexType CurIn = PixBuf.GetIndex();
@@ -141,9 +142,10 @@ std::vector<float> compute_ec_features( typename itk::SmartPointer<InputImageTyp
 				++pixel_count;
 				LabelIndices.push_back( CurIn );				
 			}
-		centroid_x = round(centroid_x/(double)pixel_count);
-		centroid_y = round(centroid_y/(double)pixel_count);
-		centroid_z = image_is_3d ? round(centroid_z/(double)pixel_count) : 0;
+		}
+		centroid_x = floor((centroid_x/(double)pixel_count)+0.5);
+		centroid_y = floor((centroid_y/(double)pixel_count)+0.5);
+		centroid_z = image_is_3d ? floor((centroid_z/(double)pixel_count)+0.5) : 0;
 
 		//Create vnl array 3xN( label indicies )
 		vnl_matrix<double> B( 3, pixel_count );

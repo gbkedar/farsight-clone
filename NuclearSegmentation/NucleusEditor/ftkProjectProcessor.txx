@@ -323,9 +323,9 @@ template <typename LabelPixelType>  void
     found =  ext.find_first_of( "_" );
     std::string num3 = ext.substr( 0, found );
     typename OutputLabelsType::IndexType OffSet;
-    OffSet[0] = std::atoll( num1.c_str() );
-    OffSet[1] = std::atoll( num2.c_str() );
-    OffSet[2] = std::atoll( num3.c_str() );
+    OffSet[0] = boost::lexical_cast<itk::IndexValueType>( num1.c_str() );
+    OffSet[1] = boost::lexical_cast<itk::IndexValueType>( num2.c_str() );
+    OffSet[2] = boost::lexical_cast<itk::IndexValueType>( num3.c_str() );
 
     //Read sub-image and compute indices of labels
     ReaderType::Pointer reader = ReaderType::New();
