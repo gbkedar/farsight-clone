@@ -215,3 +215,12 @@ int ObjectSelection::DeleteCurrentSelectionInTable()
 		return 0;
 	}
 }
+
+void ObjectSelection::silentClear()
+{
+	if( selections.size() > 0)
+	{
+		selections.clear();
+	}
+	return;
+}

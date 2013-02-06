@@ -42,6 +42,7 @@ public:
 	bool toggle(long int id);
 	bool toggle(std::set<long int> ids);
 	void clear(void);
+	void silentClear(void);
 	std::set<long int> getSelections(void);	//Returns the selections
 	int DeleteCurrentSelectionInTable();
 

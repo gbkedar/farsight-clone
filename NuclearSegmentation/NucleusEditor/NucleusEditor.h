@@ -200,6 +200,8 @@ protected slots:
 	void closeViews();
 #ifdef PROJPROC_WITH_MONT_SEG
 	void launchMontageView(void);
+	void MontageViewClosed(void);
+	void MontageViewNewRegionSelected(void);
 #endif
 	//For Editing Menu
 	void setCommonEnabled(bool val);
@@ -318,6 +320,7 @@ protected:
 	PatternAnalysisWizard *pWizard;
 	
 #ifdef PROJPROC_WITH_MONT_SEG
+	MontageRegionSelection *montageRegionSel;
 	MontageView *montageView;
 	QAction *montageViewAction;
 #endif

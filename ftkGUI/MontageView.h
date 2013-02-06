@@ -44,9 +44,6 @@ public:
   void Initialize();
   MontageRegionSelection *RegionSelection;
 
-private:
-
-public:
   struct TableEntryList{
     itk::SizeValueType x, y, z, LabelImId, TabInd;
   };
@@ -60,6 +57,10 @@ public:
      { if( t1.x == t2.x ) return t1.y < t2.y;
        else return t1.x < t2.x; }
   };
+
+signals:
+  void NewRegionSelected();
+  void MontageViewClosed();
 
 protected:
   virtual void closeEvent(QCloseEvent *event);
@@ -112,7 +113,6 @@ private:
   itk::SizeValueType CheckBoundsAndSubtractMin( itk::SizeValueType CoOrd,
   					itk::SizeValueType Min, itk::SizeValueType Max );
 
-signals:
 protected:
   void createMenus();
   void readSettings();

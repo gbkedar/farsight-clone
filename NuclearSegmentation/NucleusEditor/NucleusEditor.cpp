@@ -3056,8 +3056,28 @@ void NucleusEditor::launchMontageView()
 	segView->SetLabelImage(myImg);
 	this->closeViews();
 	montageView = new MontageView(this);
+	connect(montageView, SIGNAL(MontageViewClosed()), this, SLOT(MontageViewClosed()));
+	connect(montageView, SIGNAL(NewRegionSelected()), this, SLOT(MontageViewNewRegionSelected()));
 	montageView->show();
 }
+
+void NucleusEditor::MontageViewClosed()
+{
+  montageView = NULL;
+}
+
+void NucleusEditor::MontageViewNewRegionSelected()
+{
+  this->closeViews();
+  segView->ClearForNewMontageRegionDisplay();
+  selection->silentClear();
+
+  montageRegionSel = montageView->RegionSelection;
+  //Just in case..
+  NucAdjTable = NULL;
+
+}
+
 #endif
 //**********************************************************************
 // SLOT: start the pattern analysis widget:

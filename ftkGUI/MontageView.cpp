@@ -36,12 +36,17 @@ MontageView::MontageView( QWidget * parent )
 
 MontageView::~MontageView()
 {
-
+  if( RegionSelection )
+  {
+    delete RegionSelection;
+    RegionSelection = NULL;
+  }
 }
 
 void MontageView::closeEvent(QCloseEvent *event)
 {
-	//Delete pointer from Nucleus Editor *****
+  //Check if there are any edits made in the Nucleus Editor through RegionSelection*****
+  emit MontageViewClosed();
 }
 
 void MontageView::readSettings()
@@ -390,6 +395,7 @@ void MontageView::cropRegion()
       CropChannel->GetImageInfo()->numRows << excp << std::endl;
   }
 #endif
+  emit NewRegionSelected();
 }
 
 vtkSmartPointer<vtkTable> MontageView::GetCroppedTable( itk::SizeValueType x1, itk::SizeValueType y1,

@@ -1705,6 +1705,30 @@ float LabelImageViewQT::perpDist(int x1, int y1, int x2, int y2, int x3, int y3)
 	return dist;
 }
 
+#ifdef PROJPROC_WITH_MONT_SEG
+asdakfjshdg a
+void LabelImageViewQT::ClearForNewMontageRegionDisplay()
+{
+  labelImg = NULL;
+  channelImg = NULL;
+  labelImg = NULL;
+  centerMap.clear();
+  bBoxMap.clear();
+//Just in case any of vinay's hacks make it through
+  NucTable  = NULL;
+  CellTable = NULL;
+  kNeighborTable = NULL;
+  radNeighborTable = NULL;
+  showROI = false;
+  showKNeighbors = false;
+  k_mutual = false;
+  showRadNeighbors = false;
+  knnDone = false;
+  showNucAdj = false;
+  showCellAdj = false;
+}
+#endif
+
 
 /*
 void LabelImageViewQT::refreshFeatures(void)

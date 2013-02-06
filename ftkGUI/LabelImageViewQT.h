@@ -128,7 +128,11 @@ public:
 	int GetCurrentTimeVal(void);
 	void SetCurrentTimeVal(double time);
 
-	void clearSettings();
+	void clearSettings(void);
+
+#ifdef PROJPROC_WITH_MONT_SEG
+	void ClearForNewMontageRegionDisplay(void);
+#endif
 		
 public slots:
 	void SaveDisplayImageToFile(QString fileName);

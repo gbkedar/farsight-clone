@@ -1,12 +1,8 @@
-OPTION( BUILD_PROJPROC_WITH_MONT_SEG "Build Project Processor With Montage Segmentation" OFF )
 IF( BUILD_PROJPROC_WITH_MONT_SEG )
   IF( NOT Boost_LIBRARY_DIRS )
     message( "Compiled Boost libs not found. Perhaps you should turn BUILD_PROJPROC_WITH_MONTSEG Off" )
-  ELSE()
-    add_definitions( -DPROJPROC_WITH_MONT_SEG )
   ENDIF()
 ENDIF( BUILD_PROJPROC_WITH_MONT_SEG )
-
 
 SET( NucleusEditor_SRCS
   NucleusEditor.cpp
