@@ -27,8 +27,9 @@
 #include "MontageRegionSelection.h"
 
 //Testing
-#include "ftkCommon/ftkUtils.h"
 #include "itkImageFileWriter.h"
+
+#include "ftkCommon/ftkUtils.h"
 #include "NuclearSegmentation/NucleusEditor/ftkProjectFiles.h"
 #include "NuclearSegmentation/NucleusEditor/ftkProjectDefinition.h"
 
@@ -47,7 +48,7 @@ private:
 
 public:
   struct TableEntryList{
-    itk::SizeValueType x, y, LabelImId, TabInd;
+    itk::SizeValueType x, y, z, LabelImId, TabInd;
   };
   struct TableEntryComparator
   {  bool operator()( const TableEntryList& t, itk::SizeValueType Value ) const
@@ -100,12 +101,16 @@ private:
   std::vector< LabelStatisticsImageFilterType::BoundingBoxType > BoundingBoxes;
   std::map< itk::SizeValueType, itk::SizeValueType > LabelToTableMap;
   std::map< itk::SizeValueType, itk::SizeValueType > LabelToRelabelMap;
+  std::map<int, ftk::Object::Point> CroppedCentroidsMap;
+  std::map<int, ftk::Object::Box> CroppedBoundBoxesMap;
 
   //Utility functions
   void cropRegion(void);
   vtkSmartPointer<vtkTable> GetCroppedTable( itk::SizeValueType x1, itk::SizeValueType y1,
 	itk::SizeValueType x2, itk::SizeValueType y2 );
   itk::SizeValueType InsertNewLabelToRelabelMap( itk::SizeValueType NewKey );
+  itk::SizeValueType CheckBoundsAndSubtractMin( itk::SizeValueType CoOrd,
+  					itk::SizeValueType Min, itk::SizeValueType Max );
 
 signals:
 protected:

@@ -14,6 +14,8 @@ MontageView::MontageView( QWidget * parent )
   BoundingBoxes.clear();
   LabelToRelabelMap.clear();
   LabelToTableMap.clear();
+  CroppedCentroidsMap.clear();
+  CroppedBoundBoxesMap.clear();
   scaleFactor = DBL_MAX;
   NumberOfLabelsFound = 0;
 
@@ -262,11 +264,11 @@ void MontageView::loadProject()
     TableEntryList CurrentEntry;
     CurrentEntry.x  = Table->GetValueByName(i,"centroid_x").ToTypeUInt64();
     CurrentEntry.y  = Table->GetValueByName(i,"centroid_y").ToTypeUInt64();
-    itk::SizeValueType z  = Table->GetValueByName(i,"centroid_z").ToTypeUInt64();
+    CurrentEntry.z  = Table->GetValueByName(i,"centroid_z").ToTypeUInt64();
     CurrentEntry.LabelImId = Table->GetValueByName(i,"ID").ToTypeUInt64();
     if(!(CurrentEntry.x>=BoundingBoxes.at(i).at(0) && CurrentEntry.x<=BoundingBoxes.at(i).at(1)
       && CurrentEntry.y>=BoundingBoxes.at(i).at(2) && CurrentEntry.y<=BoundingBoxes.at(i).at(3)
-      && z>=BoundingBoxes.at(i).at(4) && z<=BoundingBoxes.at(i).at(5) ) )
+      && CurrentEntry.z>=BoundingBoxes.at(i).at(4) && CurrentEntry.z<=BoundingBoxes.at(i).at(5) ) )
       std::cerr<< i << "The centroid in the table and label image don't match for id "<< CurrentEntry.LabelImId
 		<<" Nucleus editor may crash if you click on this cell\n";
     if( LabelStats->GetValidLabelValues().at(i)!=CurrentEntry.LabelImId )
@@ -351,8 +353,12 @@ void MontageView::cropRegion()
 	sizeof(unsigned short), (x2-x1+1), (y2-y1+1), (z2-z1+1), "nuc", color, true );
     RegionSelection->SetLabelImage( CropLabel );
     if( NumberOfLabelsFound && Table )
+    {
       CropTable = this->GetCroppedTable( x1, y1, x2, y2 );
-    RegionSelection->SetTable( CropTable );
+      RegionSelection->SetTable( CropTable );
+      RegionSelection->SetBoundsMap( CroppedBoundBoxesMap );
+      RegionSelection->SetCenterMap( CroppedCentroidsMap );
+    }
   }
 #if 1
   if( LabelImage )
@@ -414,29 +420,49 @@ vtkSmartPointer<vtkTable> MontageView::GetCroppedTable( itk::SizeValueType x1, i
   }
 
   std::map< itk::SizeValueType , itk::SizeValueType >::iterator it = LabelToRelabelMap.begin();
-#ifdef _OPENMP
-  #pragma omp parallel for
-#endif
+  CroppedCentroidsMap.clear();
+  CroppedBoundBoxesMap.clear();
+  
+  //Should be replaced with iteration over LabelToRelabelMap in parallel
   for( vtkIdType i=0; i<cropTable->GetNumberOfRows(); ++i )
   {
+    ftk::Object::Point CurrentCentroid, CurrentMin, CurrentMax;
+    ftk::Object::Box CurrentBoundBox;
     cropTable->SetValue(i,0,i+1);
     std::map< itk::SizeValueType , itk::SizeValueType >::iterator it1;
     it1 = LabelToTableMap.find( it->first );
     itk::SizeValueType x = TableEntryVector.at( it1->second ).x;
-    if( x<x1 ) x = 0;
-    else if( x>x2 ) x = x2-x1-1;
-    else x -= x1;
+    CurrentCentroid.x = CheckBoundsAndSubtractMin( x, x1, x2 );
     cropTable->SetValueByName( i, "centroid_x", x );
     itk::SizeValueType y = TableEntryVector.at( it1->second ).y;
-    if( y<y1 ) y = 0;
-    else if( y>y2 ) y = y2-y1-1;
-    else y -= y1;
+    CurrentCentroid.y = CheckBoundsAndSubtractMin( y, y1, y2 );
     cropTable->SetValueByName( i, "centroid_y", y );
+    CurrentCentroid.z = TableEntryVector.at( it1->second ).z;
+    CroppedCentroidsMap[ it->second ] = CurrentCentroid;
+    itk::SizeValueType XMin, YMin, ZMin, XMax, YMax, ZMax;
+    XMin = BoundingBoxes.at(it1->second).at(0); XMax = BoundingBoxes.at(it1->second).at(1);
+    YMin = BoundingBoxes.at(it1->second).at(2); YMax = BoundingBoxes.at(it1->second).at(3);
+    CurrentMin.z = BoundingBoxes.at(it1->second).at(4);
+    CurrentMax.z = BoundingBoxes.at(it1->second).at(5);
+    CurrentMin.x = CheckBoundsAndSubtractMin( XMin, x1, x2 );
+    CurrentMax.x = CheckBoundsAndSubtractMin( XMax, x1, x2 );
+    CurrentMin.y = CheckBoundsAndSubtractMin( YMin, y1, y2 );
+    CurrentMax.y = CheckBoundsAndSubtractMin( YMax, y1, y2 );
+    CurrentBoundBox.min = CurrentMin; CurrentBoundBox.max = CurrentMax;
+    CroppedBoundBoxesMap[ it->second ] = CurrentBoundBox;
     ++it;
   }
   return cropTable;
 }
 
+itk::SizeValueType MontageView::CheckBoundsAndSubtractMin( itk::SizeValueType CoOrd,
+					itk::SizeValueType Min, itk::SizeValueType Max )
+{
+  if( CoOrd<Min ) CoOrd = 0;
+  else if( CoOrd>Max ) CoOrd = Max-Min-1;
+  else CoOrd -= Min;
+  return CoOrd;
+}
 //Take the maximum intensity projection and subsample each channel
 //Subsample the image setting the maximum x-y dimension to 1000pixels
 //Redo the contrast, cast, smooth(for aliasing), then resample
