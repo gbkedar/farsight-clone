@@ -18,6 +18,7 @@ MontageView::MontageView( QWidget * parent )
   NumberOfLabelsFound = 0;
 
   chSignalMapper = NULL;
+  RegionSelection = NULL;
 
   imageViewer = new MontageDiplayArea();
   QPushButton *allButton = new QPushButton(tr("All"));
@@ -315,9 +316,17 @@ void MontageView::cropRegion()
   ftk::Image::Pointer CropChannel = Image->
     CropImage<unsigned char>( x1, y1, z1, x2, y2, z2, itk::ImageIOBase::UCHAR, bytePerPix );
 
-  NucleusEditorLabelType::Pointer CropLabel = NULL;
-  vtkSmartPointer<vtkTable> CropTable = NULL;
+  NucleusEditorLabelType::Pointer CropLabelItk;
+  vtkSmartPointer<vtkTable> CropTable;
   LabelToRelabelMap.clear();
+
+  if( RegionSelection )
+  {
+    delete RegionSelection;
+    RegionSelection = NULL;
+  }
+  RegionSelection = new MontageRegionSelection;
+  RegionSelection->SetChannelImage( CropChannel );
 
   //Check if there are any labels and if there are get their table entries
   if( LabelImage )
@@ -325,32 +334,41 @@ void MontageView::cropRegion()
     if( Image->IsMatch<unsigned short>( Image->GetImageInfo()->dataType ) )
     {
       bytePerPix = 2;
-      CropLabel = this->RelabelImage<unsigned short>(
+      CropLabelItk = this->RelabelImage<unsigned short>(
 			LabelImage->CropImage<unsigned short>
 			( x1, y1, z1, x2, y2, z2, itk::ImageIOBase::USHORT, bytePerPix ) );
     }
     else if( Image->IsMatch<short>( Image->GetImageInfo()->dataType ) )
     {
       bytePerPix = 4;
-      CropLabel = this->RelabelImage<unsigned int>(
+      CropLabelItk = this->RelabelImage<unsigned int>(
 			LabelImage->CropImage<unsigned int>
 			( x1, y1, z1, x2, y2, z2, itk::ImageIOBase::UINT, bytePerPix ) );
     }
+    std::vector<unsigned char> color(3,255);
+    ftk::Image::Pointer CropLabel;
+    CropLabel->AppendChannelFromData3D( CropLabelItk->GetBufferPointer(), itk::ImageIOBase::USHORT,
+	sizeof(unsigned short), (x2-x1+1), (y2-y1+1), (z2-z1+1), "nuc", color, true );
+    RegionSelection->SetLabelImage( CropLabel );
+    if( NumberOfLabelsFound && Table )
+      CropTable = this->GetCroppedTable( x1, y1, x2, y2 );
+    RegionSelection->SetTable( CropTable );
   }
-  if( NumberOfLabelsFound && Table )
-  {
-    CropTable = this->GetCroppedTable( x1, y1, x2, y2 );
-  }
-#if 0
+#if 1
   if( LabelImage )
   {
     typedef itk::ImageFileWriter< NucleusEditorLabelType > BinaryWriterType;
     BinaryWriterType::Pointer binwriter = BinaryWriterType::New();
-    binwriter->SetInput( CropLabel );
+    binwriter->SetInput( CropLabelItk );
     std::string binWriterStr = "label_crop.tif";
     binwriter->SetFileName( binWriterStr.c_str() );
     try{ binwriter->Update(); }
     catch( itk::ExceptionObject & excp ){ std::cerr << "Crop Label writer" << excp << std::endl; }
+  }
+
+  if( CropTable )
+  {
+    ftk::SaveTable( "crop_table.txt", CropTable );
   }
 
   typedef itk::ImageFileWriter< itk::Image<unsigned char, 3> > BinaryWriterType1;
@@ -427,7 +445,7 @@ void MontageView::resetSubsampledImageAndDisplayImage()
   typedef itk::Image< unsigned char, 3 > Uchar3DImageType;
   typedef itk::Image< float, 3 > Float3DImageType;
   typedef itk::MaximumProjectionImageFilter< Uchar3DImageType, Uchar3DImageType > MaxProjectType;
-  typedef itk::AdaptiveHistogramEqualizationImageFilter< Uchar3DImageType > AdaptiveHistEqType;
+//typedef itk::AdaptiveHistogramEqualizationImageFilter< Uchar3DImageType > AdaptiveHistEqType;
   typedef itk::RescaleIntensityImageFilter< Uchar3DImageType >  RescaleIntensityType;
   typedef itk::CastImageFilter< Uchar3DImageType, Float3DImageType > CastFilterType;
   typedef itk::RecursiveGaussianImageFilter< Float3DImageType, Float3DImageType > GaussianFilterType;

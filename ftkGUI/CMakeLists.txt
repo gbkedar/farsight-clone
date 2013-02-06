@@ -23,6 +23,7 @@ SET( GUI_SRCS
 SET( NONQT_GUI_SRCS
 	ProcessObjectProgressUpdater.cpp
 	SelectionUtilities.cpp
+	MontageRegionSelection.cpp
 )
 
 SET( GUI_HDRS
@@ -47,15 +48,16 @@ SET( GUI_HDRS
 	QvtkTableView.h
 )
 
+SET( NONQT_GUI_HDRS
+	ProcessObjectProgressUpdater.h
+	SelectionUtilities.h
+	MontageRegionSelection.h
+)
+
 IF( BUILD_PROJPROC_WITH_MONT_SEG )
   LIST( APPEND GUI_SRCS MontageView.cpp MontageDiplayArea.cpp )
   LIST( APPEND GUI_HDRS MontageView.h   MontageDiplayArea.h )
 ENDIF()
-
-SET( NONQT_GUI_HDRS
-	ProcessObjectProgressUpdater.h
-	SelectionUtilities.h
-)
 
 SET( GUI_LIBS
   ${QT_LIBRARIES} QVTK ftkCommon ftkPreprocess ftkImage TinyXML libSVM

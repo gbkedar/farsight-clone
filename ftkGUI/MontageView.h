@@ -24,6 +24,7 @@
 //#include "itkKdTreeGenerator.h"
 
 #include "MontageDiplayArea.h"
+#include "MontageRegionSelection.h"
 
 //Testing
 #include "ftkCommon/ftkUtils.h"
@@ -40,6 +41,7 @@ public:
   MontageView(QWidget * parent = 0);
   ~MontageView();
   void Initialize();
+  MontageRegionSelection *RegionSelection;
 
 private:
 
