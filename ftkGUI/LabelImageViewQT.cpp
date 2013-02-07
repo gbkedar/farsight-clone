@@ -1711,7 +1711,7 @@ void LabelImageViewQT::ClearForNewMontageRegionDisplay()
   labelImg = NULL;
   channelImg = NULL;
   labelImg = NULL;
-  centerMap =NULL;
+  centerMap = NULL;
   bBoxMap = NULL;
 //Just in case any of vinay's hacks make it through
   NucTable  = NULL;

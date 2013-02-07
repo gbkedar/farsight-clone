@@ -228,6 +228,7 @@ void MontageView::loadProject()
   std::cout<<"Computing label stats for the label image\n";
 
   LabelStatisticsImageFilterType::Pointer LabelStats = LabelStatisticsImageFilterType::New();
+  LabelStats->SetInput( LabelImage->GetItkPtr<unsigned int>(0,0) );
   LabelStats->SetLabelInput( LabelImage->GetItkPtr<unsigned int>(0,0) );
   LabelStats->UseHistogramsOff();
 
@@ -240,7 +241,7 @@ void MontageView::loadProject()
     std::cerr << "Error in Label Image stats" << excp << std::endl;
   }
   for( LabelStatisticsImageFilterType::ValidLabelValuesContainerType::const_iterator
-	  it = LabelStats->GetValidLabelValues().begin();
+	  it = LabelStats->GetValidLabelValues().begin()+1;/*Since label 0 counted*/
 	it != LabelStats->GetValidLabelValues().end(); ++it )
   {
     LabelStatisticsImageFilterType::BoundingBoxType bb = LabelStats->GetBoundingBox( *it );
@@ -274,11 +275,11 @@ void MontageView::loadProject()
     if(!(CurrentEntry.x>=BoundingBoxes.at(i).at(0) && CurrentEntry.x<=BoundingBoxes.at(i).at(1)
       && CurrentEntry.y>=BoundingBoxes.at(i).at(2) && CurrentEntry.y<=BoundingBoxes.at(i).at(3)
       && CurrentEntry.z>=BoundingBoxes.at(i).at(4) && CurrentEntry.z<=BoundingBoxes.at(i).at(5) ) )
-      std::cerr<< i << "The centroid in the table and label image don't match for id "<< CurrentEntry.LabelImId
-		<<" Nucleus editor may crash if you click on this cell\n";
-    if( LabelStats->GetValidLabelValues().at(i)!=CurrentEntry.LabelImId )
-      std::cerr<< LabelStats->GetValidLabelValues().at(i) << "The ids don't match for label " 
-		<< CurrentEntry.LabelImId << "and table entry number " << i
+      std::cerr<< i << "The centroid in the table and label image don't match for id "
+		<< CurrentEntry.LabelImId << " Nucleus editor may crash if you click on this cell\n";
+    if( LabelStats->GetValidLabelValues().at(i+1)/*Since label 0 counted*/!=CurrentEntry.LabelImId )
+      std::cerr<< LabelStats->GetValidLabelValues().at(i+1) << " The ids don't match for label " 
+		<< CurrentEntry.LabelImId << " and table entry number " << i
 		<<" Nucleus editor may crash if you click on this cell\n";
     CurrentEntry.TabInd = i;
     TableEntryVector.push_back( CurrentEntry );

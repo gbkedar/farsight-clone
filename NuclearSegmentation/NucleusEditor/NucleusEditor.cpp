@@ -3068,14 +3068,20 @@ void NucleusEditor::MontageViewClosed()
 
 void NucleusEditor::MontageViewNewRegionSelected()
 {
+  //Just in case..
+  NucAdjTable = NULL;
+  CellAdjTable = NULL;
   this->closeViews();
+
   segView->ClearForNewMontageRegionDisplay();
   selection->silentClear();
 
   montageRegionSel = montageView->RegionSelection;
-  //Just in case..
-  NucAdjTable = NULL;
-
+  
+  segView->SetCenterMapPointer( &montageRegionSel->GetCenterMap() );
+  segView->SetBoundingBoxMapPointer( &montageRegionSel->GetBoundBoxMap() );
+  segView->SetChannelImage( montageRegionSel->GetChannelImage() );
+  segView->SetLabelImage  ( montageRegionSel->GetLabelImage() );
 }
 
 #endif
