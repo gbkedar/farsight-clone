@@ -291,6 +291,7 @@ void MontageView::loadProject()
 
 void MontageView::cropRegion()
 {
+  this->enableRegionSelButton(false);
   std::vector< int > coordinates = imageViewer->GetCoordinates();
   if( coordinates.size()!=4 )
   {

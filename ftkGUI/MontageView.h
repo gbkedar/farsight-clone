@@ -75,6 +75,7 @@ protected slots:
   void resetSubsampledImageAndDisplayImage(void);
   void SetChannelImage(void);
   void enableRegionSelButton(bool);
+  void cropRegion(void);
 
 private:
   typedef itk::Image<unsigned short, 3> NucleusEditorLabelType;
@@ -106,7 +107,6 @@ private:
   std::map<int, ftk::Object::Box> CroppedBoundBoxesMap;
 
   //Utility functions
-  void cropRegion(void);
   vtkSmartPointer<vtkTable> GetCroppedTable( itk::SizeValueType x1, itk::SizeValueType y1,
 	itk::SizeValueType x2, itk::SizeValueType y2 );
   itk::SizeValueType InsertNewLabelToRelabelMap( itk::SizeValueType NewKey );
