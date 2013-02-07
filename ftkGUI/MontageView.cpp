@@ -340,19 +340,24 @@ void MontageView::cropRegion()
   //Check if there are any labels and if there are get their table entries
   if( LabelImage )
   {
-    if( Image->IsMatch<unsigned short>( Image->GetImageInfo()->dataType ) )
+    if( LabelImage->IsMatch<unsigned short>( LabelImage->GetImageInfo()->dataType ) )
     {
       bytePerPix = 2;
       CropLabelItk = this->RelabelImage<unsigned short>(
 			LabelImage->CropImage<unsigned short>
 			( x1, y1, z1, x2, y2, z2, itk::ImageIOBase::USHORT, bytePerPix ) );
     }
-    else if( Image->IsMatch<short>( Image->GetImageInfo()->dataType ) )
+    else if( LabelImage->IsMatch<unsigned int>( LabelImage->GetImageInfo()->dataType ) )
     {
       bytePerPix = 4;
       CropLabelItk = this->RelabelImage<unsigned int>(
 			LabelImage->CropImage<unsigned int>
 			( x1, y1, z1, x2, y2, z2, itk::ImageIOBase::UINT, bytePerPix ) );
+    }
+    else
+    {
+      std::cerr<<"Unrecognized label image. unsigned and unsigned short are the valid types\n";
+      return;
     }
     std::vector<unsigned char> color(3,255);
     ftk::Image::Pointer CropLabel;
