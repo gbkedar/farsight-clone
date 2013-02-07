@@ -1706,14 +1706,13 @@ float LabelImageViewQT::perpDist(int x1, int y1, int x2, int y2, int x3, int y3)
 }
 
 #ifdef PROJPROC_WITH_MONT_SEG
-asdakfjshdg a
 void LabelImageViewQT::ClearForNewMontageRegionDisplay()
 {
   labelImg = NULL;
   channelImg = NULL;
   labelImg = NULL;
-  centerMap.clear();
-  bBoxMap.clear();
+  centerMap =NULL;
+  bBoxMap = NULL;
 //Just in case any of vinay's hacks make it through
   NucTable  = NULL;
   CellTable = NULL;
