@@ -426,12 +426,7 @@ vtkSmartPointer<vtkTable> MontageView::GetCroppedTable( itk::SizeValueType x1, i
     it1 = LabelToTableMap.find( it->first );
     if( it1!=LabelToTableMap.end() )
     {
-#if _OPENMP >= 200805L
-#pragma omp task
-#endif
-      {
-	row->DeepCopy( Table->GetRow( it1->second ) );
-      }
+      row->DeepCopy( Table->GetRow( it1->second ) );
       cropTable->InsertNextRow( row );    
     }
     else
@@ -447,35 +442,30 @@ vtkSmartPointer<vtkTable> MontageView::GetCroppedTable( itk::SizeValueType x1, i
   //Should be replaced with iteration over LabelToRelabelMap in parallel
   for( vtkIdType i=0; i<cropTable->GetNumberOfRows(); ++i, ++it )
   {
-#if _OPENMP >= 200805L
-#pragma omp task
-#endif
-    {
-      ftk::Object::Point CurrentCentroid, CurrentMin, CurrentMax;
-      ftk::Object::Box CurrentBoundBox;
-      cropTable->SetValue(i,0,i+1);
-      std::map< itk::SizeValueType , itk::SizeValueType >::iterator it1;
-      it1 = LabelToTableMap.find( it->first );
-      itk::SizeValueType x = TableEntryVector.at( it1->second ).x;
-      CurrentCentroid.x = CheckBoundsAndSubtractMin( x, x1, x2 );
-      cropTable->SetValueByName( i, "centroid_x", x );
-      itk::SizeValueType y = TableEntryVector.at( it1->second ).y;
-      CurrentCentroid.y = CheckBoundsAndSubtractMin( y, y1, y2 );
-      cropTable->SetValueByName( i, "centroid_y", y );
-      CurrentCentroid.z = TableEntryVector.at( it1->second ).z;
-      CroppedCentroidsMap[ it->second ] = CurrentCentroid;
-      itk::SizeValueType XMin, YMin, ZMin, XMax, YMax, ZMax;
-      XMin = BoundingBoxes.at(it1->second).at(0); XMax = BoundingBoxes.at(it1->second).at(1);
-      YMin = BoundingBoxes.at(it1->second).at(2); YMax = BoundingBoxes.at(it1->second).at(3);
-      CurrentMin.z = BoundingBoxes.at(it1->second).at(4);
-      CurrentMax.z = BoundingBoxes.at(it1->second).at(5);
-      CurrentMin.x = CheckBoundsAndSubtractMin( XMin, x1, x2 );
-      CurrentMax.x = CheckBoundsAndSubtractMin( XMax, x1, x2 );
-      CurrentMin.y = CheckBoundsAndSubtractMin( YMin, y1, y2 );
-      CurrentMax.y = CheckBoundsAndSubtractMin( YMax, y1, y2 );
-      CurrentBoundBox.min = CurrentMin; CurrentBoundBox.max = CurrentMax;
-      CroppedBoundBoxesMap[ it->second ] = CurrentBoundBox;
-    }
+    ftk::Object::Point CurrentCentroid, CurrentMin, CurrentMax;
+    ftk::Object::Box CurrentBoundBox;
+    cropTable->SetValue(i,0,i+1);
+    std::map< itk::SizeValueType , itk::SizeValueType >::iterator it1;
+    it1 = LabelToTableMap.find( it->first );
+    itk::SizeValueType x = TableEntryVector.at( it1->second ).x;
+    CurrentCentroid.x = CheckBoundsAndSubtractMin( x, x1, x2 );
+    cropTable->SetValueByName( i, "centroid_x", x );
+    itk::SizeValueType y = TableEntryVector.at( it1->second ).y;
+    CurrentCentroid.y = CheckBoundsAndSubtractMin( y, y1, y2 );
+    cropTable->SetValueByName( i, "centroid_y", y );
+    CurrentCentroid.z = TableEntryVector.at( it1->second ).z;
+    CroppedCentroidsMap[ it->second ] = CurrentCentroid;
+    itk::SizeValueType XMin, YMin, ZMin, XMax, YMax, ZMax;
+    XMin = BoundingBoxes.at(it1->second).at(0); XMax = BoundingBoxes.at(it1->second).at(1);
+    YMin = BoundingBoxes.at(it1->second).at(2); YMax = BoundingBoxes.at(it1->second).at(3);
+    CurrentMin.z = BoundingBoxes.at(it1->second).at(4);
+    CurrentMax.z = BoundingBoxes.at(it1->second).at(5);
+    CurrentMin.x = CheckBoundsAndSubtractMin( XMin, x1, x2 );
+    CurrentMax.x = CheckBoundsAndSubtractMin( XMax, x1, x2 );
+    CurrentMin.y = CheckBoundsAndSubtractMin( YMin, y1, y2 );
+    CurrentMax.y = CheckBoundsAndSubtractMin( YMax, y1, y2 );
+    CurrentBoundBox.min = CurrentMin; CurrentBoundBox.max = CurrentMax;
+    CroppedBoundBoxesMap[ it->second ] = CurrentBoundBox;
   }
 #if DEBUG_MONTV
     ftk::SaveTable( "crop_table1.txt", cropTable );
