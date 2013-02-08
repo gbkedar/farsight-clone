@@ -254,14 +254,18 @@ bool ProjectProcessor::SegmentNuclei(int nucChannel)
 	const ftk::Image::Info *info = inputImage->GetImageInfo();
 	if(info->numTSlices==1)
 	{
+#ifdef PROJPROC_WITH_MONT_SEG
 		itk::SizeValueType Default3dSize = 536870912; //512MB
 		itk::SizeValueType Default2dSize = 16777216; //16MB
 		itk::SizeValueType StackSize     = info->numZSlices*info->numColumns*info->numRows;
 		if( ( ( StackSize > Default3dSize ) && ( info->numZSlices >  1 ) ) ||
-		    ( ( StackSize > Default2dSize ) && ( info->numZSlices == 1 ) ) ){
+		    ( ( StackSize > Default2dSize ) && ( info->numZSlices == 1 ) ) )
+		{
 			SegmentNucleiMontage(nucChannel);
 		}
-		else{
+		else
+#endif
+		{
 			nucSeg->Binarize(false);
 			nucSeg->DetectSeeds(false);
 			if(finalize)

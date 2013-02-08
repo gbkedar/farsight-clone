@@ -3072,6 +3072,8 @@ void NucleusEditor::MontageViewNewRegionSelected()
   //Just in case..
   NucAdjTable = NULL;
   CellAdjTable = NULL;
+  table = NULL;
+
   this->closeViews();
 
   segView->ClearForNewMontageRegionDisplay();
@@ -3083,6 +3085,8 @@ void NucleusEditor::MontageViewNewRegionSelected()
   segView->SetBoundingBoxMapPointer( &montageRegionSel->GetBoundBoxMap() );
   segView->SetChannelImage( montageRegionSel->GetChannelImage() );
   segView->SetLabelImage  ( montageRegionSel->GetLabelImage(), selection );
+
+  table = montageRegionSel->GetTable();
 }
 
 #endif
