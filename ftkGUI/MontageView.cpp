@@ -1,5 +1,7 @@
 #include "MontageView.h"
 
+#define DEBUG_MONTV 1
+
 MontageView::MontageView( QWidget * parent )
 {
   setWindowTitle(tr("Montage View"));
@@ -360,7 +362,7 @@ void MontageView::cropRegion()
       return;
     }
     std::vector<unsigned char> color(3,255);
-    ftk::Image::Pointer CropLabel;
+    ftk::Image::Pointer CropLabel = ftk::Image::New();
     CropLabel->AppendChannelFromData3D( CropLabelItk->GetBufferPointer(), itk::ImageIOBase::USHORT,
 	sizeof(unsigned short), (x2-x1+1), (y2-y1+1), (z2-z1+1), "nuc", color, true );
     RegionSelection->SetLabelImage( CropLabel );
@@ -372,7 +374,7 @@ void MontageView::cropRegion()
       RegionSelection->SetCenterMap( CroppedCentroidsMap );
     }
   }
-#if 1
+#if DEBUG_MONTV
   if( LabelImage )
   {
     typedef itk::ImageFileWriter< NucleusEditorLabelType > BinaryWriterType;
@@ -409,10 +411,11 @@ vtkSmartPointer<vtkTable> MontageView::GetCroppedTable( itk::SizeValueType x1, i
 		itk::SizeValueType x2, itk::SizeValueType y2 )
 {
   vtkSmartPointer<vtkTable> cropTable = vtkSmartPointer<vtkTable>::New();
-  for( vtkIdType i = 0; Table->GetNumberOfColumns(); ++i )
+  for( vtkIdType i = 0; i<Table->GetNumberOfColumns(); ++i )
   {
     vtkSmartPointer<vtkDoubleArray> column = vtkSmartPointer<vtkDoubleArray>::New();
     column->SetName( Table->GetColumnName(i) );
+    cropTable->AddColumn(column);
   }
 
   for( std::map< itk::SizeValueType , itk::SizeValueType >::iterator it = LabelToRelabelMap.begin();
@@ -465,6 +468,9 @@ vtkSmartPointer<vtkTable> MontageView::GetCroppedTable( itk::SizeValueType x1, i
     CroppedBoundBoxesMap[ it->second ] = CurrentBoundBox;
     ++it;
   }
+#if DEBUG_MONTV
+    ftk::SaveTable( "crop_table1.txt", cropTable );
+#endif
   return cropTable;
 }
 

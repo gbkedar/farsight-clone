@@ -468,6 +468,7 @@ void NucleusEditor::createMenus()
 #ifdef PROJPROC_WITH_MONT_SEG
 	montageViewAction = new QAction(tr("Launch Montage View"),this);
 	montageViewAction->setObjectName("montageViewAction");
+	montageViewAction->setShortcut(tr("Shift+M"));
 	connect(montageViewAction, SIGNAL(triggered()), this, SLOT(launchMontageView()) );
 	viewMenu->addAction(montageViewAction);
 #endif
@@ -3081,7 +3082,7 @@ void NucleusEditor::MontageViewNewRegionSelected()
   segView->SetCenterMapPointer( &montageRegionSel->GetCenterMap() );
   segView->SetBoundingBoxMapPointer( &montageRegionSel->GetBoundBoxMap() );
   segView->SetChannelImage( montageRegionSel->GetChannelImage() );
-  segView->SetLabelImage  ( montageRegionSel->GetLabelImage() );
+  segView->SetLabelImage  ( montageRegionSel->GetLabelImage(), selection );
 }
 
 #endif
