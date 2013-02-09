@@ -283,12 +283,10 @@ void MontageView::loadProject()
       std::cerr<< LabelStats->GetValidLabelValues().at(i+1) << " The ids don't match for label " 
 		<< CurrentEntry.LabelImId << " and table entry number " << i
 		<<" Nucleus editor may crash if you click on this cell\n";
-    CurrentEntry.TabInd = i;
     TableEntryVector.push_back( CurrentEntry );
     LabelToTableMap.insert(std::map<itk::SizeValueType, itk::SizeValueType>::value_type
     				( CurrentEntry.LabelImId, i ) );
   }
-  std::sort( TableEntryVector.begin(), TableEntryVector.end(), MontageView::TableEntryComparator() );
 }
 
 void MontageView::cropRegion()
@@ -440,19 +438,20 @@ vtkSmartPointer<vtkTable> MontageView::GetCroppedTable( itk::SizeValueType x1, i
   CroppedBoundBoxesMap.clear();
   
   //Should be replaced with iteration over LabelToRelabelMap in parallel
+  std::cout<<x1<<"\t"<<x2<<"\t"<<y1<<"\t"<<y2<<"\n";
   for( vtkIdType i=0; i<cropTable->GetNumberOfRows(); ++i, ++it )
   {
     ftk::Object::Point CurrentCentroid, CurrentMin, CurrentMax;
     ftk::Object::Box CurrentBoundBox;
-    cropTable->SetValue(i,0,i+1);
+    cropTable->SetValueByName(i,"ID", it->second);
     std::map< itk::SizeValueType , itk::SizeValueType >::iterator it1;
     it1 = LabelToTableMap.find( it->first );
     itk::SizeValueType x = TableEntryVector.at( it1->second ).x;
     CurrentCentroid.x = CheckBoundsAndSubtractMin( x, x1, x2 );
-    cropTable->SetValueByName( i, "centroid_x", x );
+    cropTable->SetValueByName( i, "centroid_x", CurrentCentroid.x );
     itk::SizeValueType y = TableEntryVector.at( it1->second ).y;
     CurrentCentroid.y = CheckBoundsAndSubtractMin( y, y1, y2 );
-    cropTable->SetValueByName( i, "centroid_y", y );
+    cropTable->SetValueByName( i, "centroid_y", CurrentCentroid.y );
     CurrentCentroid.z = TableEntryVector.at( it1->second ).z;
     CroppedCentroidsMap[ it->second ] = CurrentCentroid;
     itk::SizeValueType XMin, YMin, ZMin, XMax, YMax, ZMax;

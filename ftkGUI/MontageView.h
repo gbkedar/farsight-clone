@@ -45,17 +45,7 @@ public:
   MontageRegionSelection *RegionSelection;
 
   struct TableEntryList{
-    itk::SizeValueType x, y, z, LabelImId, TabInd;
-  };
-  struct TableEntryComparator
-  {  bool operator()( const TableEntryList& t, itk::SizeValueType Value ) const
-     { return t.x < Value; }
-     bool operator()( itk::SizeValueType Value, const TableEntryList& t ) const
-     { return Value < t.x; }
-     //Following operator:Indexing table and image initiall-->Can afford to be inefficient
-     bool operator()( const TableEntryList& t1, const TableEntryList& t2 ) const
-     { if( t1.x == t2.x ) return t1.y < t2.y;
-       else return t1.x < t2.x; }
+    itk::SizeValueType x, y, z, LabelImId;
   };
 
 signals:
