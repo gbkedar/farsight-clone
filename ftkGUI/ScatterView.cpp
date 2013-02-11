@@ -45,6 +45,14 @@ void ScatterView::setModels(vtkSmartPointer<vtkTable> tbl, ObjectSelection * sel
 	this->update();
 }
 
+//*****************************************************************************************
+// Close signal sent, disconnect the signals so that other views continue to function
+//*****************************************************************************************
+void ScatterView::closeEvent(QCloseEvent *event)
+{
+	disconnect(selection, SIGNAL(changed()), this, SLOT(repaint()));
+	event->accept();
+}
 //**************************************************************************************
 // SLOT: clears the selections and selectionRegion
 //**************************************************************************************

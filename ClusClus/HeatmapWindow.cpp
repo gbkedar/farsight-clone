@@ -3174,6 +3174,12 @@ void Heatmap::GetSelecectedIDsForSPD()
 
 void Heatmap::closeEvent(QCloseEvent *event)
 {
+	if( Selection )
+	{
+		disconnect(Selection, SIGNAL(changed()), this, SLOT(GetSelecectedIDs()));
+		Selection = NULL;
+	}
+
 	mainQTRenderWidget.close();
 }
 

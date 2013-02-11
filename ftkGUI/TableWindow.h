@@ -75,6 +75,7 @@ public:
 	void setQtModels(QItemSelectionModel *mod);
 	void setModels(vtkSmartPointer<vtkTable> table, ObjectSelection * sels = NULL, ObjectSelection * sels2 = NULL);//////////////////////
 	vtkSmartPointer<vtkTable> Pointer2Table;
+	void disconnectSignals(void);
 
 signals:
 	void closing(QWidget *widget);

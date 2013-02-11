@@ -45,6 +45,21 @@ void TableWindow::setQtModels(QItemSelectionModel * mod)
 	this->tableView->setSelectionBehavior( QAbstractItemView::SelectRows);
 	this->update();
 }
+
+void TableWindow::disconnectSignals()
+{
+  if(this->modAdapter)
+  {
+    delete this->modAdapter;
+    this->modAdapter=NULL;
+  }
+  if(selAdapter){
+    delete selAdapter;
+    selAdapter = NULL;
+  }
+  if(this->selection2) connect(selection2, SIGNAL(changed()), this, SLOT(selectColumns()));
+    selection2 = NULL;
+}
 	
 void TableWindow::setModels(vtkSmartPointer<vtkTable> table, ObjectSelection * sels, ObjectSelection * sels2)///////////////////////////////////////////
 {
@@ -54,7 +69,7 @@ void TableWindow::setModels(vtkSmartPointer<vtkTable> table, ObjectSelection * s
 		this->modAdapter = NULL;
 	}
 	this->modAdapter = new vtkQtTableModelAdapter();
-	this->modAdapter->setTable(  table );
+	this->modAdapter->setTable( table );
 	//this->modAdapter->SetKeyColumn(0);	//Key column is used as the row headers
 	this->tableView->setModel( modAdapter );
 
@@ -189,6 +204,7 @@ void TableWindow::exportSelectedIDs()
 
 void TableWindow::closeEvent(QCloseEvent *event)
 {
+	this->disconnectSignals();
 	emit closing(this);
 	event->accept();
 } 

@@ -71,6 +71,7 @@ protected:
     void mouseReleaseEvent(QMouseEvent *event);
 	void keyPressEvent(QKeyEvent * event );
 	void keyReleaseEvent(QKeyEvent *event );
+	void closeEvent(QCloseEvent *event);
 
 private:
 	void selectRegion(void);

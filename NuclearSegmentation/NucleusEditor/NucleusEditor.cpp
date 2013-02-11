@@ -3080,13 +3080,16 @@ void NucleusEditor::MontageViewNewRegionSelected()
   selection->silentClear();
 
   montageRegionSel = montageView->RegionSelection;
-  
-  segView->SetCenterMapPointer( &montageRegionSel->GetCenterMap() );
-  segView->SetBoundingBoxMapPointer( &montageRegionSel->GetBoundBoxMap() );
-  segView->SetChannelImage( montageRegionSel->GetChannelImage() );
-  segView->SetLabelImage  ( montageRegionSel->GetLabelImage(), selection );
 
-  table = montageRegionSel->GetTable();
+  segView->SetChannelImage( montageRegionSel->GetChannelImage() );
+
+  if( montageRegionSel->GetLabelImage() && montageRegionSel->GetTable() )
+  {
+    segView->SetCenterMapPointer( &montageRegionSel->GetCenterMap() );
+    segView->SetBoundingBoxMapPointer( &montageRegionSel->GetBoundBoxMap() );
+    segView->SetLabelImage  ( montageRegionSel->GetLabelImage(), selection );
+    table = montageRegionSel->GetTable();
+  }
 }
 
 #endif
@@ -3671,16 +3674,22 @@ void NucleusEditor::viewClosing(QWidget * view)
 void NucleusEditor::closeViews()
 {
 	for(int p=0; p<(int)tblWin.size(); ++p)
+	{
+		disconnect(tblWin.at(p), SIGNAL(closing(QWidget *)), this, SLOT(viewClosing(QWidget *)));
 		tblWin.at(p)->close();
+	}
 
 	for(int p=0; p<(int)pltWin.size(); ++p)
+	{
+		disconnect(pltWin.back(), SIGNAL(closing(QWidget *)), this, SLOT(viewClosing(QWidget *)));
 		pltWin.at(p)->close();
+	}
 
 	for(int p=0; p<(int)hisWin.size(); ++p)
+	{
 		hisWin.at(p)->close();
-
-	for(int p=0; p<(int)hisWin.size(); ++p)
-		hisWin.at(p)->close();
+		//disconnect();
+	}
 }
 
 //Call this slot when the table has been modified (new rows or columns) to update the views:
