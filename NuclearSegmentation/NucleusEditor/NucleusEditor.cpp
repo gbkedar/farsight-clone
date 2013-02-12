@@ -3082,12 +3082,14 @@ void NucleusEditor::MontageViewNewRegionSelected()
   montageRegionSel = montageView->RegionSelection;
 
   segView->SetChannelImage( montageRegionSel->GetChannelImage() );
+  myImg = montageRegionSel->GetChannelImage();
 
   if( montageRegionSel->GetLabelImage() && montageRegionSel->GetTable() )
   {
     segView->SetCenterMapPointer( &montageRegionSel->GetCenterMap() );
     segView->SetBoundingBoxMapPointer( &montageRegionSel->GetBoundBoxMap() );
     segView->SetLabelImage  ( montageRegionSel->GetLabelImage(), selection );
+    labImg = montageRegionSel->GetLabelImage();
     table = montageRegionSel->GetTable();
   }
 }
