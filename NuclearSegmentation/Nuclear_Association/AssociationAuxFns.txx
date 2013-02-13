@@ -110,6 +110,7 @@ std::vector<float> compute_ec_features( typename itk::SmartPointer<InputImageTyp
 #else
 	for( itk::IndexValueType i=0; i<labelsList.size(); ++i )
 #endif
+#else
 	for( typename LabelImageType::PixelType i=0; i<labelsList.size(); ++i )
 #endif
 	{
