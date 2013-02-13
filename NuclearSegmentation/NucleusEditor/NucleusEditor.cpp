@@ -3038,28 +3038,28 @@ void NucleusEditor::displayKymoGraph()
 #ifdef PROJPROC_WITH_MONT_SEG
 void NucleusEditor::launchMontageView()
 {
-	if( montageView )
-	{
-		QMessageBox msgBox;
-		msgBox.setInformativeText("There is already a Montage View window open");
-		msgBox.setStandardButtons(QMessageBox::Ok);
-		msgBox.setDefaultButton(QMessageBox::Ok);
-		int ret = msgBox.exec();
-		return;
-	}
-	//Delete current images
-	this->clearSelections();
-	if(labImg)
-		delete labImg;
-	if(myImg)
-		delete myImg;
-	segView->SetChannelImage(myImg);
-	segView->SetLabelImage(myImg);
-	this->closeViews();
-	montageView = new MontageView(this);
-	connect(montageView, SIGNAL(MontageViewClosed()), this, SLOT(MontageViewClosed()));
-	connect(montageView, SIGNAL(NewRegionSelected()), this, SLOT(MontageViewNewRegionSelected()));
-	montageView->show();
+  if( montageView )
+  {
+    QMessageBox msgBox;
+    msgBox.setInformativeText("There is already a Montage View window open");
+    msgBox.setStandardButtons(QMessageBox::Ok);
+    msgBox.setDefaultButton(QMessageBox::Ok);
+    int ret = msgBox.exec();
+    return;
+  }
+  //Delete current images
+  this->clearSelections();
+  if(labImg)
+    delete labImg;
+  if(myImg)
+    delete myImg;
+  segView->SetChannelImage(myImg);
+  segView->SetLabelImage(myImg);
+  this->closeViews();
+  montageView = new MontageView(this);
+  connect(montageView, SIGNAL(MontageViewClosed()), this, SLOT(MontageViewClosed()));
+  connect(montageView, SIGNAL(NewRegionSelected()), this, SLOT(MontageViewNewRegionSelected()));
+  montageView->show();
 }
 
 void NucleusEditor::MontageViewClosed()
@@ -3086,9 +3086,9 @@ void NucleusEditor::MontageViewNewRegionSelected()
 
   if( montageRegionSel->GetLabelImage() && montageRegionSel->GetTable() )
   {
+    segView->SetLabelImage  ( montageRegionSel->GetLabelImage(), selection );
     segView->SetCenterMapPointer( &montageRegionSel->GetCenterMap() );
     segView->SetBoundingBoxMapPointer( &montageRegionSel->GetBoundBoxMap() );
-    segView->SetLabelImage  ( montageRegionSel->GetLabelImage(), selection );
     labImg = montageRegionSel->GetLabelImage();
     table = montageRegionSel->GetTable();
   }
