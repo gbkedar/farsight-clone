@@ -3091,7 +3091,23 @@ void NucleusEditor::MontageViewNewRegionSelected()
     segView->SetBoundingBoxMapPointer( &montageRegionSel->GetBoundBoxMap() );
     labImg = montageRegionSel->GetLabelImage();
     table = montageRegionSel->GetTable();
+    this->SetupNucSegObjectForMontageRegion();
   }
+}
+
+void NucleusEditor::SetupNucSegObjectForMontageRegion()
+{
+  if(nucSeg)
+  {
+    delete nucSeg;
+    nucSeg = NULL;
+  }
+
+  nucSeg = new ftk::NuclearSegmentation();
+  nucSeg->SetInput( myImg, "nuc_img", montageRegionSel->GetNucChannel() );
+  nucSeg->SetLabelImage( labImg, "lab_img" );
+  nucSeg->SetCenterMap( montageRegionSel->GetCenterMap() );
+  nucSeg->SetBoundingBoxMap( montageRegionSel->GetBoundBoxMap() );
 }
 
 #endif

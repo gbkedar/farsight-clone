@@ -26,12 +26,8 @@
 #include "MontageDiplayArea.h"
 #include "MontageRegionSelection.h"
 
-//Testing
-#include "itkImageFileWriter.h"
-
 #include "ftkCommon/ftkUtils.h"
-#include "NuclearSegmentation/NucleusEditor/ftkProjectFiles.h"
-#include "NuclearSegmentation/NucleusEditor/ftkProjectDefinition.h"
+#include "NuclearSegmentation/NucleusEditor/ftkProjectProcessor.h"
 
 #include <boost/bind.hpp>
 
@@ -66,6 +62,7 @@ protected slots:
   void SetChannelImage(void);
   void enableRegionSelButton(bool);
   void cropRegion(void);
+  void processProject(void);
 
 private:
   typedef itk::Image<unsigned short, 3> NucleusEditorLabelType;
@@ -86,6 +83,7 @@ private:
   ftk::ProjectDefinition projectDefinition;		//the project definition currently being used.
   double scaleFactor;
   itk::SizeValueType NumberOfLabelsFound;
+  int nucChannel;
 
   template<typename pixelType> NucleusEditorLabelType::Pointer
   				RelabelImage(ftk::Image::Pointer InputImage);
@@ -102,6 +100,7 @@ private:
   itk::SizeValueType InsertNewLabelToRelabelMap( itk::SizeValueType NewKey );
   itk::SizeValueType CheckBoundsAndSubtractMin( itk::SizeValueType CoOrd,
   					itk::SizeValueType Min, itk::SizeValueType Max );
+  void Process(void);
 
 protected:
   void createMenus();
@@ -113,6 +112,7 @@ protected:
   QMenu *fileMenu;
   QAction *loadProjectAction;
   QAction *loadImageAction;
+  QAction *processAction;
   QAction *exitAction;
 
   QMenu *viewMenu;

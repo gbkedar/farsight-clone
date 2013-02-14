@@ -2,6 +2,10 @@
 
 #define DEBUG_MONTV 1
 
+#ifdef DEBUG_MONTV
+#include "itkImageFileWriter.h"
+#endif
+
 MontageView::MontageView( QWidget * parent )
 {
   setWindowTitle(tr("Montage View"));
@@ -20,6 +24,7 @@ MontageView::MontageView( QWidget * parent )
   CroppedBoundBoxesMap.clear();
   scaleFactor = DBL_MAX;
   NumberOfLabelsFound = 0;
+  nucChannel = -1;
 
   chSignalMapper = NULL;
   RegionSelection = NULL;
@@ -81,6 +86,13 @@ void MontageView::createMenus()
   loadImageAction->setShortcut(tr("Ctrl+O"));
   connect(loadImageAction, SIGNAL(triggered()), this, SLOT(askLoadImage()));
   fileMenu->addAction(loadImageAction);
+
+  processAction = new QAction(tr("Process Image"), this);
+  processAction->setObjectName("Process image action");
+  processAction->setStatusTip(tr("Process the images"));
+  processAction->setShortcut(tr("Ctrl+P"));
+  connect( processAction, SIGNAL(triggered()), this, SLOT(processProject()) );
+  fileMenu->addAction( processAction );
 
   fileMenu->addSeparator();
 
@@ -203,6 +215,8 @@ void MontageView::loadProject()
   else return;
 
   projectDefinition.Load( projectFiles.GetFullDef() );
+  nucChannel = projectDefinition.FindInputChannel("NUCLEAR");
+  if( nucChannel == -1) nucChannel = 0;
 
   TableEntryVector.clear();
   BoundingBoxes.clear();
@@ -371,8 +385,10 @@ void MontageView::cropRegion()
       RegionSelection->SetBoundsMap( CroppedBoundBoxesMap );
       RegionSelection->SetCenterMap( CroppedCentroidsMap );
     }
+    RegionSelection->SetProjectDef( &projectDefinition );
+    RegionSelection->SetNucChannel( nucChannel );
   }
-#if DEBUG_MONTV
+#ifdef DEBUG_MONTV
   if( LabelImage )
   {
     typedef itk::ImageFileWriter< NucleusEditorLabelType > BinaryWriterType;
@@ -438,7 +454,9 @@ vtkSmartPointer<vtkTable> MontageView::GetCroppedTable( itk::SizeValueType x1, i
   CroppedBoundBoxesMap.clear();
   
   //Should be replaced with iteration over LabelToRelabelMap in parallel
+#if DEBUG_MONTV
   std::cout<<x1<<"\t"<<x2<<"\t"<<y1<<"\t"<<y2<<"\n";
+#endif
   for( vtkIdType i=0; i<cropTable->GetNumberOfRows(); ++i, ++it )
   {
     ftk::Object::Point CurrentCentroid, CurrentMin, CurrentMax;
@@ -466,7 +484,7 @@ vtkSmartPointer<vtkTable> MontageView::GetCroppedTable( itk::SizeValueType x1, i
     CurrentBoundBox.min = CurrentMin; CurrentBoundBox.max = CurrentMax;
     CroppedBoundBoxesMap[ it->second ] = CurrentBoundBox;
   }
-#if DEBUG_MONTV
+#ifdef DEBUG_MONTV
     ftk::SaveTable( "crop_table1.txt", cropTable );
 #endif
   return cropTable;
@@ -582,6 +600,7 @@ void MontageView::resetSubsampledImageAndDisplayImage()
     rescale->SetOutputMaximum( itk::NumericTraits<Uchar3DImageType::PixelType>::max() );
     rescale->SetOutputMinimum( itk::NumericTraits<Uchar3DImageType::PixelType>::min() );
 
+#ifdef DEBUG_MONTV
     std::string opstring = ftk::GetFilePath( filenames.at(i) )+ "/" 
     			   + imInfo->channelNames.at(i) + "_subsample.tif";
     typedef itk::ImageFileWriter< Uchar3DImageType > ImageFileWriterType;
@@ -589,12 +608,16 @@ void MontageView::resetSubsampledImageAndDisplayImage()
     writer->SetFileName( opstring.c_str() );
     writer->SetInput( rescale->GetOutput() );
     std::cout<<"Writing downsampled image:"<<opstring<<std::endl;
+#endif
 
     try
     {
       std::cout<<"Resampling Channel "<< imInfo->channelNames.at(i) << std::endl;
-      //rescale->Update();
+#ifdef DEBUG_MONTV
       writer->Update();
+#else
+      rescale->Update();
+#endif
     }
     catch( itk::ExceptionObject & excep )
     {
@@ -605,7 +628,7 @@ void MontageView::resetSubsampledImageAndDisplayImage()
 	itk::ImageIOBase::UCHAR, sizeof(Uchar3DImageType::PixelType), size[0], size[1], size[2],
 	imInfo->channelNames.at(i), imInfo->channelColors.at(i), true );
     std::cout	<<"Channel image name "<<SubsampledImage->GetChannelNames().at(i)
-		<<"\tsize:\tz="<<size[2]<<"\ty="<<size[1]<<"\tx="<<size[0]<<std::endl;
+		<<"\tsubsample size:\tz="<<size[2]<<"\ty="<<size[1]<<"\tx="<<size[0]<<std::endl;
    }
   }
   int resizeRows, resizeCols;
@@ -626,6 +649,46 @@ void MontageView::toggleChannel( int chNum )
 	std::vector<bool> ch_stats = imageViewer->GetChannelFlags();
 	ch_stats[chNum] = !ch_stats[chNum];
 	imageViewer->SetChannelFlags( ch_stats );
+}
+
+void MontageView::processProject(void)
+{
+  if(!Image) return;
+  QString projectName = QFileDialog::getOpenFileName(
+    this, "Select Definition File", lastPath,
+    tr("XML Project Definition (*.xml)\n"
+    "All Files (*.*)"));
+  if(projectName == "")  return;
+  lastPath = QFileInfo(projectName).absolutePath() + QDir::separator();
+
+  //Load up the definition
+  if( !projectDefinition.Load(projectName.toStdString()) ) return;
+
+  projectFiles.path = lastPath.toStdString();
+  projectFiles.definition = QFileInfo(projectName).fileName().toStdString();
+  projectFiles.definitionSaved = true;
+  projectFiles.nucSegValidated = false;
+
+  this->Process();
+}
+
+void MontageView::Process()
+{
+  //Set up a new processor:
+  ftk::ProjectProcessor *pProc = new ftk::ProjectProcessor();
+  pProc->SetPath( lastPath.toStdString() );
+  pProc->SetInputImage( Image );
+  if( LabelImage )
+    pProc->SetOutputImage( LabelImage );
+  if( Table )
+    pProc->SetTable( Table );
+  pProc->SetDefinition( &projectDefinition );
+  pProc->Initialize();
+  while(!pProc->DoneProcessing())
+    pProc->ProcessNext();
+
+  LabelImage = pProc->GetOutputImage();
+  Table = pProc->GetTable();
 }
 
 itk::SizeValueType MontageView::InsertNewLabelToRelabelMap( itk::SizeValueType NewKey )

@@ -38,7 +38,7 @@
 #include <ftkFeatures/ftkLabelImageToFeatures.h>
 #include <ftkCommon/ftkUtils.h>
 #include <ftkFeatures/ftkObject.h>
-#include <yousef_core/yousef_seg.h>
+#include <NuclearSegmentation/yousef_core/yousef_seg.h>
 
 #include <vtkSmartPointer.h>
 #include <vtkTable.h>
@@ -67,23 +67,23 @@ public:
 	bool SetInput(ftk::Image::Pointer inImg, std::string fname, int chNumber = 0); //Pass a pointer to the already loaded image
 	void SetParameters(std::string paramfile);
 	void SetParameter(std::string name, int value);
-	bool Binarize(bool getResultImg = false);					//Will binarize the data image
+	bool Binarize(bool getResultImg = false);				//Will binarize the data image
 	bool DetectSeeds(bool getResultImg = false);				//If binarization has been done it will detect seeds
 	bool RunClustering(bool getResultImg = false);				//Will use binary image and seeds to do initial clustering
-	bool Finalize();											//Will finilize the output using alpha expansion
+	bool Finalize();							//Will finilize the output using alpha expansion
 	bool SegmentAllTimes(bool finalize = false);				//Will segment the nuclei of all time points.
-	void ReleaseSegMemory();									//Delete the NucleusSeg object to release all of its memory.
-	bool ComputeAllGeometries();								//Compute all geometries for the label image!!!
-	bool ComputeAllGeometries(int numTimes);					//Compute all geometries and return the features for the label image across time!!!
+	void ReleaseSegMemory();						//Delete the NucleusSeg object to release all of its memory.
+	bool ComputeAllGeometries();						//Compute all geometries for the label image!!!
+	bool ComputeAllGeometries(int numTimes);				//Compute all geometries and return the features for the label image across time!!!
 
 	//For use when loading from pre-existing results:
-	bool LoadLabelImage(std::string fname);						//Filename of the label image to load
-	bool LoadFromDAT(std::string fname);						//Load label image from .dat
+	bool LoadLabelImage(std::string fname);					//Filename of the label image to load
+	bool LoadFromDAT(std::string fname);					//Load label image from .dat
 	bool SetLabelImage(ftk::Image::Pointer labImg, std::string fname);	//Pass pointer to already loaded label image
 
 	//Save functions:
 	bool SaveLabelImage(std::string fname = "");				//Save the output image of the last step executed (image format)
-	//bool SaveLabelByClass();									//Will save a different label image for each class
+	//bool SaveLabelByClass();						//Will save a different label image for each class
 	
 	//Editing Functions 
 	std::vector< int > Split(ftk::Object::Point P1, ftk::Object::Point P2, vtkSmartPointer<vtkTable> table = NULL, vtkSmartPointer<vtkTable> NucAdjTable = NULL);
@@ -117,7 +117,9 @@ public:
 	ftk::Image::Pointer GetDataImage(void){ return dataImage; };	
 	ftk::Image::Pointer GetLabelImage(void){ return labelImage; };
 	std::map<int, ftk::Object::Point> * GetCenterMapPointer(){ return &centerMap; };
-	std::map<int, ftk::Object::Box> * GetBoundingBoxMapPointer(){ return &bBoxMap; };	
+	std::map<int, ftk::Object::Box> * GetBoundingBoxMapPointer(){ return &bBoxMap; };
+	void SetCenterMap( std::map<int, ftk::Object::Point> &inp ) { centerMap = inp; };
+	void SetBoundingBoxMap( std::map<int, ftk::Object::Box> &inp ) { bBoxMap = inp; };
 	std::vector<std::map<int, ftk::Object::Point> >  centerMap4DImage;
 	std::vector<std::map<int, ftk::Object::Box> > bBoxMap4DImage;	
 	std::vector<std::vector<ftk::IntrinsicFeatures> > featureVector4DImage;
@@ -143,31 +145,31 @@ public:
 protected:
 	std::string errorMessage;
 
-	std::string dataFilename;			//Name of the file that the data came from
+	std::string dataFilename;		//Name of the file that the data came from
 	ftk::Image::Pointer dataImage;		//The data image
-	int channelNumber;					//Use this channel from the dataImage for segmentation
-	std::string labelFilename;			//Name of the file that is the label image
+	int channelNumber;			//Use this channel from the dataImage for segmentation
+	std::string labelFilename;		//Name of the file that is the label image
 	ftk::Image::Pointer labelImage;		//My label image
 	yousef_nucleus_seg *NucleusSeg;		//The Nuclear Segmentation module
-	int lastRunStep;					//0,1,2,3,4 for the stages in a nuclear segmentation.
-	int currentTime;					//current Nucleus Editor time slider.
+	int lastRunStep;			//0,1,2,3,4 for the stages in a nuclear segmentation.
+	int currentTime;			//current Nucleus Editor time slider.
 			
 	std::string paramFilename;
 	std::vector<Parameter> myParameters;
 	std::vector<std::string> paramNames;
 
 	//Geometry information that is kept for editing purposes:
-	std::map<int, ftk::Object::Box>		bBoxMap;			//Bounding boxes
-	std::map<int, ftk::Object::Point>	centerMap;			//Centroids
+	std::map<int, ftk::Object::Box>		bBoxMap;	//Bounding boxes
+	std::map<int, ftk::Object::Point>	centerMap;	//Centroids
 
 
-	bool GetResultImage();									//Gets the result of last module and puts it in labelImage
-	void GetParameters(void);								//Retrieve the Parameters from nuclear segmentation.
-	void ResetAll(void);									//Clear all memory and variables
+	bool GetResultImage();				//Gets the result of last module and puts it in labelImage
+	void GetParameters(void);			//Retrieve the Parameters from nuclear segmentation.
+	void ResetAll(void);				//Clear all memory and variables
 	void ConvertParameters(int params[12]);
 	
 	//Editing Utilities:
-	long int maxID(void);										//Get the maximum ID in the table!
+	long int maxID(void);				//Get the maximum ID in the table!
 	bool addObjectToMaps(int ID, int x1, int y1, int z1, int x2, int y2, int z2, vtkSmartPointer<vtkTable> table = NULL);
 	bool addObjectsToMaps(std::set<unsigned short> IDs, int x1, int y1, int z1, int x2, int y2, int z2, vtkSmartPointer<vtkTable> table = NULL, vtkSmartPointer<vtkTable> NucAdjTable = NULL);
 	void removeObjectFromMaps(int ID, vtkSmartPointer<vtkTable> table);

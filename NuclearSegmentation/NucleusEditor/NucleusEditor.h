@@ -202,6 +202,7 @@ protected slots:
 	void launchMontageView(void);
 	void MontageViewClosed(void);
 	void MontageViewNewRegionSelected(void);
+	void SetupNucSegObjectForMontageRegion(void);
 #endif
 	//For Editing Menu
 	void setCommonEnabled(bool val);

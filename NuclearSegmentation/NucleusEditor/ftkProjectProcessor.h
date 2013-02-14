@@ -27,9 +27,9 @@
 #define __ftkProjectProcessor_h
 
 #include "ftkProjectDefinition.h"
-#include <ftkNuclearSegmentation.h>
-#include <CytoplasmSegmentation/CytoplasmSegmentation.h>
-#include <Nuclear_Association/ftkNuclearAssociationRules.h>
+#include <NuclearSegmentation/ftkNuclearSegmentation.h>
+#include <NuclearSegmentation/CytoplasmSegmentation/CytoplasmSegmentation.h>
+#include <NuclearSegmentation/Nuclear_Association/ftkNuclearAssociationRules.h>
 #include <ftkLabelImageToFeatures.h>
 #include <ftkImage.h>
 #include <ftkUtils.h>
@@ -39,7 +39,7 @@
 #include "ftkGUI/PatternAnalysisWizard.h"
 #include "ftkGraphs/FTKgraph.h"
 #include "ftkPreprocess2.h"
-#include "PixelAnalysis/ftkPixelLevelAnalysis.h"
+#include "NuclearSegmentation/PixelAnalysis/ftkPixelLevelAnalysis.h"
 #include "SQLite/NESqlite/NESqliteFactory.h"
 #include "PatternAnalysis/activeLearning/mclr.h"
 
