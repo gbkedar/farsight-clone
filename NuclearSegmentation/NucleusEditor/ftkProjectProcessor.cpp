@@ -404,7 +404,7 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
 #endif
     for( itk::SizeValueType j=0; j<NumHorizontalTiles; ++j )
     {
-	std::cout<<"Binarizing tile "<< (i*NumVerticalTiles+j) <<" of "
+	std::cout<<"Binarizing tile "<< (i*NumHorizontalTiles+j) <<" of "
 		 <<(NumVerticalTiles*NumHorizontalTiles)<<"\n";
 	InputImageType1::IndexType Start;
 	//Ensure that the last tile is big enough
