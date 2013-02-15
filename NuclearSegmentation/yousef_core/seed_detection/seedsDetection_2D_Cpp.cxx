@@ -412,6 +412,11 @@ void Detect_Local_MaximaPoints(float* im_vals, int r, int c, double scale, unsig
 				out1[(i*c)+j]=0;
         }
     }  
+    for(int i=0; i<r; i++)
+    {
+        free(im[i]);
+    }
+    free(im);
     	        
 }
 

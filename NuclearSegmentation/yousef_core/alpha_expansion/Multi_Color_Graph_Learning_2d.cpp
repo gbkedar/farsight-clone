@@ -130,6 +130,7 @@ float* multiColGraphLearning(float* X_vals, unsigned short* labs_vals, int r, in
         }
         free(labs_im[i]);        
     }
+    free(labs_im[r-1]);
     free(labs_im);    
     
     
@@ -303,6 +304,22 @@ float* multiColGraphLearning(float* X_vals, unsigned short* labs_vals, int r, in
 				out[(j + i * c) * (ncolors + 1) + cc] = (float) std::min(-log(Pr[cc]), 100.0);     //I need to double check this line!!           
         }
     }
-   
-	return out;
+    for(int i=0; i<max_lab; i++)
+    {
+        for(int j=0; j<2; j++)
+        {
+	   free(Segma[i][j]);
+	}
+	free(Segma[i]);
+	free(U[i]);
+    }
+    free(Segma);
+    free(U);
+    free(P_I);
+    free(Z_sum);
+    free(Pr);
+    free(ColorOut);
+    delete Gcol;
+
+    return out;
 }

@@ -127,4 +127,6 @@ void alpha_expansion_2d( float *im, float *sublogImg, unsigned short *subclustIm
 	
 	delete[] hCue;
 	delete[] vCue;
+	delete[] SC;
+	free( Dterms );
 }
