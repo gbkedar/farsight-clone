@@ -641,6 +641,7 @@ void MontageView::resetSubsampledImageAndDisplayImage()
 void MontageView::SetChannelImage()
 {
   imageViewer->SetChannelImage( SubsampledImage );
+  this->DisplayChannelsMenu(); //To enable keyboard toggle shortcuts
   //Clear nucleus editor views, label and table ***************
 }
 
