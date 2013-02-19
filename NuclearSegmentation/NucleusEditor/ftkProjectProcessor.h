@@ -117,7 +117,7 @@ protected:
 					 BBoxType BBox, unsigned MaxScale,
 					 LabelImageType1::PixelType CurrentBBLabel, std::string TempFolder,
 					 LabelImageType1::PixelType& NumCells,
-					 LabelImageType::Pointer IntermediateLabel );
+					 LabelImageType::Pointer& IntermediateLabel );
 	std::string CheckWritePermissionsNCreateTempFolder();
 	template <typename LabelPixelType>  void
 		StitchLabels( std::vector< std::string >& TempSegFiles );

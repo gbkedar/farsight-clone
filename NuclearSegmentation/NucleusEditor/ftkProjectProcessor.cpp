@@ -691,6 +691,7 @@ std::vector< ftk::ProjectProcessor::BBoxType > ProjectProcessor::ReSegmentCCs
 	std::cerr <<  "Write for intermediate labels failed" << excp << std::endl;
       }
     }
+    IntermediateLabel->UnRegister();
   }
   return OutputBBoxes;
 }
@@ -698,7 +699,7 @@ std::vector< ftk::ProjectProcessor::BBoxType > ProjectProcessor::ReSegmentCCs
 std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer InputImage,
 			LabelImageType1::Pointer CCImage, BBoxType BBox, unsigned MaxScale,
 			LabelImageType1::PixelType CurrentBBLabel, std::string TempFolder,
-			LabelImageType1::PixelType& NumCells, LabelImageType::Pointer IntermediateLabel )
+			LabelImageType1::PixelType& NumCells, LabelImageType::Pointer& IntermediateLabel )
 {
 //Start copy pasta  ***From BinarizeTile***
   typedef itk::RegionOfInterestImageFilter< InputImageType1, InputImageType1 > ROIFilterType;
@@ -776,7 +777,8 @@ std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer Inpu
   //Get Output
   ftk::Image::Pointer FTKOImage = newNucSeg->GetLabelImage();
   IntermediateLabel = FTKOImage->
-			GetItkPtr< LabelImageType::PixelType >( 0, 0, ftk::Image::DEFAULT );
+			GetItkPtr< LabelImageType::PixelType >( 0, 0, ftk::Image::DEEP_COPY );
+  IntermediateLabel->Register();
 
   //Get CCs of the segmented cells
   LabelGeometryImageFilterType::Pointer LabelGeometryFilter = LabelGeometryImageFilterType::New();
