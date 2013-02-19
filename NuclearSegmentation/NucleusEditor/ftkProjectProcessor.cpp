@@ -845,9 +845,7 @@ std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer Inpu
   writer->SetInput( LabIm );
   writer->SetFileName( OutFile.c_str() );
   try{
-#if defined _WIN32 || defined _WIN64
 #pragma omp critical
-#endif
     writer->Update();
   }
   catch( itk::ExceptionObject & excp )
