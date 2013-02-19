@@ -844,7 +844,12 @@ std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer Inpu
   WriterType::Pointer writer = WriterType::New();
   writer->SetInput( LabIm );
   writer->SetFileName( OutFile.c_str() );
-  try{ writer->Update(); }
+  try{
+#if defined _WIN32 || defined _WIN64
+#pragma omp critical
+#endif
+    writer->Update();
+  }
   catch( itk::ExceptionObject & excp )
   {
     std::cerr <<  "Write for intermediate labels failed" << excp << std::endl;
