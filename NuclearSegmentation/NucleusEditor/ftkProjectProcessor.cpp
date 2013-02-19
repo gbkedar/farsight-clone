@@ -632,6 +632,7 @@ std::vector< ftk::ProjectProcessor::BBoxType > ProjectProcessor::ReSegmentCCs
 {
   typedef itk::LabelStatisticsImageFilter< InputImageType1, LabelImageType1 > LabelStatisticsImageFilterType;
   typedef LabelStatisticsImageFilterType::ValidLabelValuesContainerType ValidLabelValuesType;
+  typedef itk::ImageFileWriter< LabelImageType > WriterType;
   std::vector< BBoxType > OutputBBoxes;
 #ifdef _OPENMP
   itk::MultiThreader::SetGlobalDefaultNumberOfThreads(n_thr);
@@ -658,6 +659,7 @@ std::vector< ftk::ProjectProcessor::BBoxType > ProjectProcessor::ReSegmentCCs
   SegOutFilenames.resize( labelsList.size() );
 
   //Segment images and write outputs
+  WriterType::Pointer writer = WriterType::New(); //Writer for all intermediate labels
 #ifdef _OPENMP
 #if _OPENMP >= 200805L
   #pragma omp parallel for num_threads(n_thr) schedule(dynamic,1) \
@@ -671,30 +673,39 @@ std::vector< ftk::ProjectProcessor::BBoxType > ProjectProcessor::ReSegmentCCs
   for( LabelImageType1::PixelType i=0; i<labelsList.size(); ++i )
 #endif
   {
+    LabelImageType::Pointer IntermediateLabel;
     LabelImageType1::PixelType NumCells=0;
     SegOutFilenames.at(i) = SegmentNucleiInBBox( InputImage, CCImage, OutputBBoxes.at(i), MaxScale,
-    						 labelsList.at(i), TempFolder, NumCells );
+    						 labelsList.at(i), TempFolder, NumCells, IntermediateLabel );
 #pragma omp critical
-    NumberOfCells += (itk::SizeValueType)NumCells;
-
+    {
+      NumberOfCells += (itk::SizeValueType)NumCells;
+      //Write intermediate file
+      writer->SetInput( IntermediateLabel );
+      writer->SetFileName( SegOutFilenames.at(i).c_str() );
+      try{
+	writer->Update();
+      }
+      catch( itk::ExceptionObject & excp )
+      {
+	std::cerr <<  "Write for intermediate labels failed" << excp << std::endl;
+      }
+    }
   }
-  
   return OutputBBoxes;
 }
 
 std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer InputImage,
 			LabelImageType1::Pointer CCImage, BBoxType BBox, unsigned MaxScale,
 			LabelImageType1::PixelType CurrentBBLabel, std::string TempFolder,
-			LabelImageType1::PixelType& NumCells)
+			LabelImageType1::PixelType& NumCells, LabelImageType::Pointer IntermediateLabel )
 {
 //Start copy pasta  ***From BinarizeTile***
-  typedef itk::Image< unsigned short,  3 >  IntermediateLabelType;
   typedef itk::RegionOfInterestImageFilter< InputImageType1, InputImageType1 > ROIFilterType;
   typedef itk::ImageRegionIteratorWithIndex< InputImageType1 > BinMontageIteratorType;
-  typedef itk::ImageRegionIteratorWithIndex< IntermediateLabelType > LabelIteratorType;
+  typedef itk::ImageRegionIteratorWithIndex< LabelImageType > LabelIteratorType;
   typedef itk::ImageRegionConstIterator< LabelImageType1 > CCsConstIteratorType;
-  typedef itk::LabelGeometryImageFilter< IntermediateLabelType > LabelGeometryImageFilterType;
-  typedef itk::ImageFileWriter< IntermediateLabelType > WriterType;
+  typedef itk::LabelGeometryImageFilter< LabelImageType > LabelGeometryImageFilterType;
 
   InputImageType1::SizeType ImageSize;
   ImageSize[0] = InputImage->GetLargestPossibleRegion().GetSize()[0];
@@ -764,15 +775,15 @@ std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer Inpu
 
   //Get Output
   ftk::Image::Pointer FTKOImage = newNucSeg->GetLabelImage();
-  IntermediateLabelType::Pointer LabIm = FTKOImage->
-				GetItkPtr< IntermediateLabelType::PixelType >( 0, 0, ftk::Image::DEFAULT );
+  IntermediateLabel = FTKOImage->
+			GetItkPtr< LabelImageType::PixelType >( 0, 0, ftk::Image::DEFAULT );
 
   //Get CCs of the segmented cells
   LabelGeometryImageFilterType::Pointer LabelGeometryFilter = LabelGeometryImageFilterType::New();
   LabelGeometryFilter->CalculatePixelIndicesOn();
   LabelGeometryFilter->CalculateOrientedBoundingBoxOff();
   LabelGeometryFilter->CalculateOrientedLabelRegionsOff();
-  LabelGeometryFilter->SetInput( LabIm );
+  LabelGeometryFilter->SetInput( IntermediateLabel );
 
   try{ LabelGeometryFilter->Update(); }
   catch( itk::ExceptionObject & excp )
@@ -787,7 +798,7 @@ std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer Inpu
   {
     LabelGeometryImageFilterType::LabelPixelType labelValue = *allLabelsIt;
     LabelGeometryFilter->GetCentroid(labelValue);
-    IntermediateLabelType::IndexType CurrentCentroid;
+    LabelImageType::IndexType CurrentCentroid;
     CurrentCentroid[0] = LabelGeometryFilter->GetCentroid(labelValue)[0];
     CurrentCentroid[1] = LabelGeometryFilter->GetCentroid(labelValue)[1];
     CurrentCentroid[2] = LabelGeometryFilter->GetCentroid(labelValue)[2];
@@ -799,10 +810,10 @@ std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer Inpu
     if( labelValue && CCsIter.Get()!=CurrentBBLabel ) //No need to overwrite label 0
     {
       //Delete the label
-      std::vector< IntermediateLabelType::IndexType > LabelPixels =
-      							LabelGeometryFilter->GetPixelIndices(labelValue);
-      LabelIteratorType DeleteIter( LabIm, LabIm->GetLargestPossibleRegion() );
-      std::vector< IntermediateLabelType::IndexType >::iterator it;
+      std::vector< LabelImageType::IndexType > LabelPixels =
+ 						LabelGeometryFilter->GetPixelIndices(labelValue);
+      LabelIteratorType DeleteIter( IntermediateLabel, IntermediateLabel->GetLargestPossibleRegion() );
+      std::vector< LabelImageType::IndexType >::iterator it;
       for( it=LabelPixels.begin(); it!=LabelPixels.end(); ++it )
       {
         DeleteIter.SetIndex( *it );
@@ -840,18 +851,6 @@ std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer Inpu
 #endif
   }
 
-  //Write intermediate file
-  WriterType::Pointer writer = WriterType::New();
-  writer->SetInput( LabIm );
-  writer->SetFileName( OutFile.c_str() );
-  try{
-#pragma omp critical
-    writer->Update();
-  }
-  catch( itk::ExceptionObject & excp )
-  {
-    std::cerr <<  "Write for intermediate labels failed" << excp << std::endl;
-  }
   delete newNucSeg;
   return OutFile;
 }
