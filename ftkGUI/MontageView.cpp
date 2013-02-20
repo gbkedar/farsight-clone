@@ -1,6 +1,6 @@
 #include "MontageView.h"
 
-#define DEBUG_MONTV 1
+//#define DEBUG_MONTV
 
 #ifdef DEBUG_MONTV
 #include "itkImageFileWriter.h"
@@ -288,6 +288,10 @@ void MontageView::loadProject()
     CurrentEntry.y  = Table->GetValueByName(i,"centroid_y").ToTypeUInt64();
     CurrentEntry.z  = Table->GetValueByName(i,"centroid_z").ToTypeUInt64();
     CurrentEntry.LabelImId = Table->GetValueByName(i,"ID").ToTypeUInt64();
+    CurrentEntry.xDownSampled = (itk::SizeValueType)
+				(std::floor(((double)CurrentEntry.x)/((double)scaleFactor)+0.5));
+    CurrentEntry.yDownSampled = (itk::SizeValueType)
+				(std::floor(((double)CurrentEntry.y)/((double)scaleFactor)+0.5));
     if(!(CurrentEntry.x>=BoundingBoxes.at(i).at(0) && CurrentEntry.x<=BoundingBoxes.at(i).at(1)
       && CurrentEntry.y>=BoundingBoxes.at(i).at(2) && CurrentEntry.y<=BoundingBoxes.at(i).at(3)
       && CurrentEntry.z>=BoundingBoxes.at(i).at(4) && CurrentEntry.z<=BoundingBoxes.at(i).at(5) ) )
@@ -710,4 +714,46 @@ itk::SizeValueType MontageView::InsertNewLabelToRelabelMap( itk::SizeValueType N
   LabelToRelabelMap.insert( std::map<itk::SizeValueType, itk::SizeValueType>::value_type
     				( NewKey, (LabelToRelabelMap.size()+1) ) );
   return LabelToRelabelMap.size();
+}
+
+void MontageView::LaunchCellTypingWindow()
+{
+  std::vector< std::string > GroupNames;
+  //Group the associations with the same starting strings separated by _
+  std::vector<ftk::AssociationRule>::iterator ascit;
+  for(  ascit=projectDefinition->associationRules.begin();
+  	ascit!=projectDefinition->associationRules.end(); ++ascit )
+  {
+    if( GroupNames.empty() )
+    {
+      unsigned found = ascit->GetRuleName().find_first_of("_");
+      std::string currentGroup = ascit->GetRuleName().substr( 0, found );
+      GroupNames.push_back( currentGroup );
+    }
+    else
+    {
+      unsigned found = ascit->GetRuleName().find_first_of("_");
+      unsigned groupID = 0;
+      std::string currentGroup = ascit->GetRuleName().substr( 0, found );
+      for( unsigned i=0; i<GroupNames.size(); ++i )
+      {
+	if( GroupNames.at(i).compare(currentGroup)==0 )
+	  groupID = i;
+      }
+      if( !groupID )
+      {
+	GroupNames.push_back( currentGroup );
+	std::vector< std::string > NewStringVector;
+	NewStringVector.push_back( ascit->GetRuleName() );
+	ClassificationGroups.push_back( NewStringVector );
+      }
+      else
+      {
+        ClassificationGroups.at(i).push_back( ascit->GetRuleName() );
+      }
+    }
+  }
+  CellTypingDialog *dialog = new CellTypingDialog(table, channel_names, this);
+  dialog->show();
+  connect(dialog, SIGNAL(thresholdChanged( std::vector< bool > )), segView, SLOT(respondToSlider(std::vector< bool >)));
 }

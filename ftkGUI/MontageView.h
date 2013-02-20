@@ -41,7 +41,7 @@ public:
   MontageRegionSelection *RegionSelection;
 
   struct TableEntryList{
-    itk::SizeValueType x, y, z, LabelImId;
+    itk::SizeValueType x, y, z, LabelImId, xDownSampled, yDownSampled;
   };
 
 signals:
