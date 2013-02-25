@@ -70,9 +70,9 @@ void alpha_expansion_2d( float *im, float *sublogImg, unsigned short *subclustIm
 	K = 10000;
 	float* Dterms  = multiColGraphLearning(sublogImg, subclustImg, R, C, &K);
 	K = K+1;
-	std::cerr<<"    Graph Coloring done with "<<K-1<<" colors"<<std::endl;
+	std::cout<<"    Graph Coloring done with "<<K-1<<" colors"<<std::endl;
 	
-	std::cerr<<"    Starting alpha-expansion..";
+	std::cout<<"    Starting alpha-expansion..";
 	float w = 10.0;
 	//initialize the smoothness constat part
 	float* SC = new float[K*K];

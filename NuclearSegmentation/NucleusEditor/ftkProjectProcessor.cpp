@@ -367,6 +367,7 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
   itk::SizeValueType NumberOfCells = 0;
 { //Scoping for CCImage
   LabelImageType1::Pointer CCImage;
+  std::string binWriterStr = TempFolder + "/bin_out.nrrd";
   //Step 1: Binarize the images
 { //Scoping for binary image
   //Start by allocating memory for the binary image
@@ -396,6 +397,8 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
   	shared( InputImage, BinaryImage, TileSize, MaxScale, numRows, numColumns, numStacks )
   for( itk::SizeValueType i=0; i<NumVerticalTiles; ++i )
 #else
+  omp_set_nested(0);
+  omp_set_num_threads(n_thr);
   #pragma omp parallel for num_threads(n_thr)
   for( itk::IndexValueType i=0; i<NumVerticalTiles; ++i )
 #endif
@@ -419,15 +422,14 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
 	Size[2] = numStacks;
 	BinarizeTile( InputImage, BinaryImage, Start, Size, TempFolder );
     }
-#if 0
+
   typedef itk::ImageFileWriter< InputImageType1 > BinaryWriterType;
   BinaryWriterType::Pointer binwriter = BinaryWriterType::New();
   binwriter->SetInput( BinaryImage );
-  std::string binWriterStr = TempFolder + "/bin_out.tif";
   binwriter->SetFileName( binWriterStr.c_str() );
   try{ binwriter->Update(); }
   catch( itk::ExceptionObject & excp ){ std::cerr << excp << std::endl; }
-#endif
+
   //Compute CCs and save them
 #ifdef _OPENMP
   itk::MultiThreader::SetGlobalDefaultNumberOfThreads(n_thr);
@@ -445,6 +447,7 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
 #endif
   ILabelsBBoxes = ReSegmentCCs( InputImage, CCImage, SegOutFilenames, labelsList, TempFolder, MaxScale,
   				NumberOfCells );
+  SegOutFilenames.push_back( binWriterStr );
 } //End scoping for CCImage
   std::cout<<"Segmentation done. Stitching "<<NumberOfCells<<" labels together.\n";
   if( NumberOfCells < itk::NumericTraits<LabelImageType::PixelType>::max() )
@@ -632,7 +635,6 @@ std::vector< ftk::ProjectProcessor::BBoxType > ProjectProcessor::ReSegmentCCs
 {
   typedef itk::LabelStatisticsImageFilter< InputImageType1, LabelImageType1 > LabelStatisticsImageFilterType;
   typedef LabelStatisticsImageFilterType::ValidLabelValuesContainerType ValidLabelValuesType;
-  typedef itk::ImageFileWriter< LabelImageType > WriterType;
   std::vector< BBoxType > OutputBBoxes;
 #ifdef _OPENMP
   itk::MultiThreader::SetGlobalDefaultNumberOfThreads(n_thr);
@@ -659,14 +661,15 @@ std::vector< ftk::ProjectProcessor::BBoxType > ProjectProcessor::ReSegmentCCs
   SegOutFilenames.resize( labelsList.size() );
 
   //Segment images and write outputs
-  WriterType::Pointer writer = WriterType::New(); //Writer for all intermediate labels
 #ifdef _OPENMP
 #if _OPENMP >= 200805L
   #pragma omp parallel for num_threads(n_thr) schedule(dynamic,1) \
   shared( InputImage, CCImage, OutputBBoxes, MaxScale, labelsList, TempFolder, NumberOfCells )
   for( LabelImageType1::PixelType i=0; i<labelsList.size(); ++i )
 #else
-  #pragma omp parallel for num_threads(n_thr)
+  omp_set_nested(0);
+  omp_set_num_threads(n_thr);
+  #pragma omp parallel for num_threads(n_thr) schedule(dynamic,1)
   for( itk::IndexValueType i=0; i<labelsList.size(); ++i )
 #endif
 #else
@@ -681,19 +684,28 @@ std::vector< ftk::ProjectProcessor::BBoxType > ProjectProcessor::ReSegmentCCs
     {
       NumberOfCells += (itk::SizeValueType)NumCells;
       //Write intermediate file
-      writer->SetInput( IntermediateLabel );
-      writer->SetFileName( SegOutFilenames.at(i).c_str() );
-      try{
-	writer->Update();
-      }
-      catch( itk::ExceptionObject & excp )
-      {
-	std::cerr <<  "Write for intermediate labels failed" << excp << std::endl;
-      }
+	  WriteIntermediateLabels( IntermediateLabel, SegOutFilenames.at(i) );
     }
     IntermediateLabel->UnRegister();
+	IntermediateLabel->DisconnectPipeline();
   }
   return OutputBBoxes;
+}
+
+void ProjectProcessor::WriteIntermediateLabels( LabelImageType::Pointer &Input, std::string  str )
+{
+  typedef itk::ImageFileWriter< LabelImageType > WriterType;
+  WriterType::Pointer writer = WriterType::New(); //Writer for all intermediate labels
+  writer->SetInput( Input );
+  writer->SetFileName( str.c_str() );
+  try
+  {
+    writer->Update();
+  }
+  catch( itk::ExceptionObject & excp )
+  {
+    std::cerr <<  "Write for intermediate labels failed" << excp << std::endl;
+  }
 }
 
 std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer InputImage,

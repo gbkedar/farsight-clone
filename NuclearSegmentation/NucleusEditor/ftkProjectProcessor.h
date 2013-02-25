@@ -118,6 +118,7 @@ protected:
 					 LabelImageType1::PixelType CurrentBBLabel, std::string TempFolder,
 					 LabelImageType1::PixelType& NumCells,
 					 LabelImageType::Pointer& IntermediateLabel );
+	void WriteIntermediateLabels( LabelImageType::Pointer &Input, std::string  str );
 	std::string CheckWritePermissionsNCreateTempFolder();
 	template <typename LabelPixelType>  void
 		StitchLabels( std::vector< std::string >& TempSegFiles );

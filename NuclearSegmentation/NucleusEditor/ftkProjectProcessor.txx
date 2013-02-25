@@ -297,7 +297,7 @@ template <typename LabelPixelType>  void
   OutputLabelImage->Update();
 
   itk::SizeValueType NumFilesToStitch = TempSegFiles.size();
-  LabelPixelType NumLabelsUsed = 0;
+  LabelPixelType NumLabelsUsed = 1;
 #ifdef _OPENMP
    #pragma omp parallel for num_threads(n_thr) \
    shared( TempSegFiles, OutputLabelImage, NumLabelsUsed )
