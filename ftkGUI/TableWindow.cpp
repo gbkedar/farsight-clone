@@ -53,12 +53,16 @@ void TableWindow::disconnectSignals()
     delete this->modAdapter;
     this->modAdapter=NULL;
   }
-  if(selAdapter){
+  if(selAdapter)
+  {
     delete selAdapter;
     selAdapter = NULL;
   }
-  if(this->selection2) connect(selection2, SIGNAL(changed()), this, SLOT(selectColumns()));
+  if(this->selection2)
+  {
+    disconnect(selection2, SIGNAL(changed()), this, SLOT(selectColumns()));
     selection2 = NULL;
+  }
 }
 	
 void TableWindow::setModels(vtkSmartPointer<vtkTable> table, ObjectSelection * sels, ObjectSelection * sels2)///////////////////////////////////////////
