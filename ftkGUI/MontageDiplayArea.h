@@ -19,6 +19,7 @@
 #include <iostream>
 
 #include "LabelImageViewQT.h"
+#include "CellTypingDialog.h"
 
 class MontageDiplayArea  : public QWidget
 {
@@ -32,9 +33,11 @@ public:
   std::vector<bool> GetChannelFlags(void){ return channelFlags; };
   void SetChannelFlags(std::vector<bool> chFlags);
   std::vector< int > GetCoordinates();
+  bool paintingCentroidClass;
 
 public slots:
-
+ void respondToSlider(
+	std::vector< std::pair<itk::SizeValueType,itk::SizeValueType> >&, QColor&, unsigned& );
 
 signals:
 //  void boxDrawn(int x1, int y1, int x2, int y2, int z);
@@ -65,6 +68,10 @@ protected:
   itk::SizeValueType totalWidth, totalHeight;
 
   std::vector<bool> channelFlags;	//is channel is visible or not
+  std::vector< std::pair<itk::SizeValueType,itk::SizeValueType> > centroidPoints; //Classification
+  itk::SizeValueType numPointsToPaint;
+  QColor paintCentroidsColor;
+  void repaintCentroids( itk::SizeValueType numPointsToPaint );
 
   QImage displayImage;			//Currently displayed image
   QImage baseImage;			//The intensity image (2D)

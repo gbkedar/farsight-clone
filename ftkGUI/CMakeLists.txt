@@ -18,6 +18,7 @@ SET( GUI_SRCS
 	GraphWindow.cpp
 	SelectiveClustering.cpp
 	QvtkTableView.cpp
+	CellTypingDialog.cpp
 )
 
 SET( NONQT_GUI_SRCS
@@ -46,6 +47,7 @@ SET( GUI_HDRS
 	GraphWindow.h
 	SelectiveClustering.h
 	QvtkTableView.h
+	CellTypingDialog.h
 )
 
 SET( NONQT_GUI_HDRS

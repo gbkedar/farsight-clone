@@ -15,6 +15,7 @@ MontageView::MontageView( QWidget * parent )
   SubsampledImage = NULL;
   LabelImage = NULL;
   Table = NULL;
+  cellTypeDialog = NULL;
   //tree = NULL;
   TableEntryVector.clear();
   BoundingBoxes.clear();
@@ -32,6 +33,8 @@ MontageView::MontageView( QWidget * parent )
   imageViewer = new MontageDiplayArea();
   QPushButton *allButton = new QPushButton(tr("All"));
   this->setCentralWidget(imageViewer);
+
+  cellTypingDialog = NULL;
 
   this->createMenus();
   this->createToolBar();
@@ -458,7 +461,7 @@ vtkSmartPointer<vtkTable> MontageView::GetCroppedTable( itk::SizeValueType x1, i
   CroppedBoundBoxesMap.clear();
   
   //Should be replaced with iteration over LabelToRelabelMap in parallel
-#if DEBUG_MONTV
+#ifdef DEBUG_MONTV
   std::cout<<x1<<"\t"<<x2<<"\t"<<y1<<"\t"<<y2<<"\n";
 #endif
   for( vtkIdType i=0; i<cropTable->GetNumberOfRows(); ++i, ++it )
@@ -719,16 +722,32 @@ itk::SizeValueType MontageView::InsertNewLabelToRelabelMap( itk::SizeValueType N
 void MontageView::LaunchCellTypingWindow()
 {
   std::vector< std::string > GroupNames;
+  std::vector< unsigned >    GroupChannelNumbers;
   //Group the associations with the same starting strings separated by _
   std::vector<ftk::AssociationRule>::iterator ascit;
-  for(  ascit=projectDefinition->associationRules.begin();
-  	ascit!=projectDefinition->associationRules.end(); ++ascit )
+  for(  ascit=projectDefinition.associationRules.begin();
+  	ascit!=projectDefinition.associationRules.end(); ++ascit )
   {
     if( GroupNames.empty() )
     {
       unsigned found = ascit->GetRuleName().find_first_of("_");
       std::string currentGroup = ascit->GetRuleName().substr( 0, found );
       GroupNames.push_back( currentGroup );
+      GroupChannelNumbers.push_back( 0 );
+      for( unsigned i=0; i<projectDefinition.inputs.size(); ++i )
+      {
+	if( ascit->GetTargetFileNmae().compare( projectDefinition.inputs.at(i).name )==0 )
+	{
+	  GroupChannelNumbers.back() = i;
+	  break;
+	}
+      }
+      if( ascit->GetTargetFileNmae().compare
+      		( projectDefinition.inputs.at(GroupChannelNumbers.back()).name )!=0 )
+      {
+	std::cout<<"Target image "<<ascit->GetTargetFileNmae() 
+		 <<" did not match any of the input images\n";
+      }
     }
     else
     {
@@ -740,20 +759,51 @@ void MontageView::LaunchCellTypingWindow()
 	if( GroupNames.at(i).compare(currentGroup)==0 )
 	  groupID = i;
       }
-      if( !groupID )
+      if( GroupNames.at(groupID).compare(currentGroup)!=0 )
       {
 	GroupNames.push_back( currentGroup );
 	std::vector< std::string > NewStringVector;
 	NewStringVector.push_back( ascit->GetRuleName() );
 	ClassificationGroups.push_back( NewStringVector );
+        GroupChannelNumbers.push_back( 0 );
+	unsigned j;
+	for( unsigned j=0; j<projectDefinition.inputs.size(); ++j )
+	{
+	  if( ascit->GetTargetFileNmae().compare( projectDefinition.inputs.at(j).name )==0 )
+	  {
+	    GroupChannelNumbers.back() = j;
+	    break;
+	  }
+	}
+	if( ascit->GetTargetFileNmae().compare( projectDefinition.inputs.at(j).name )!=0 )
+	  std::cout << "Target image " << ascit->GetTargetFileNmae()
+		<< " did not match any of the input images. Setting to channel 0.\n";
       }
       else
       {
-        ClassificationGroups.at(i).push_back( ascit->GetRuleName() );
+	ClassificationGroups.at(groupID).push_back( ascit->GetRuleName() );
       }
     }
   }
-  CellTypingDialog *dialog = new CellTypingDialog(table, channel_names, this);
-  dialog->show();
-  connect(dialog, SIGNAL(thresholdChanged( std::vector< bool > )), segView, SLOT(respondToSlider(std::vector< bool >)));
+  std::vector< std::pair<itk::SizeValueType,itk::SizeValueType> > DownSampledCoords;
+  for( itk::SizeValueType i=0; i<TableEntryVector.size(); ++i )
+  {
+    std::pair<itk::SizeValueType,itk::SizeValueType>
+	currentCoords( TableEntryVector.at(i).xDownSampled,TableEntryVector.at(i).yDownSampled );
+    DownSampledCoords.push_back( currentCoords );
+  }
+  cellTypeDialog = new CellTypingDialog( GroupChannelNumbers, Table, ClassificationGroups,
+				GroupNames, DownSampledCoords, this );
+  cellTypeDialog->show();
+  connect( cellTypeDialog,
+  	SIGNAL( thresholdChanged( std::vector< std::pair<itk::SizeValueType,itk::SizeValueType> >, QColor, unsigned ) ),
+	imageViewer,
+	SLOT( respondToSlider( std::vector< std::pair<itk::SizeValueType,itk::SizeValueType> >, QColor, unsigned ) ) );
+  connect( cellTypeDialog, SIGNAL( closing() ), this, SLOT( cellTypingDialogClosing() ) );
+}
+
+void MontageView::cellTypingDialogClosing()
+{
+  cellTypeDialog = NULL;
+  imageViewer->paintingCentroidClass = false;
 }

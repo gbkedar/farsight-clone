@@ -6,6 +6,7 @@ MontageDiplayArea::MontageDiplayArea(QWidget *parent)
   channelImg = NULL;
   totalWidth = totalHeight = 0;
   channelFlags.clear();
+  centroidPoints.clear();
 
   this->setupUI();
 
@@ -14,6 +15,10 @@ MontageDiplayArea::MontageDiplayArea(QWidget *parent)
   setMouseTracking(true);
   rubberBand = NULL;
   mousePress = false;
+  paintingCentroidClass = false;
+
+  numPointsToPaint    = 0;
+  paintCentroidsColor = Qt::green;		
 }
 
 
@@ -194,13 +199,16 @@ void MontageDiplayArea::refreshBaseImage()
 }
 
 void MontageDiplayArea::paintEvent(QPaintEvent * event)
-{	
+{
+
   QWidget::paintEvent(event);
 
   if(baseImage.height() <= 0 || baseImage.width() <= 0)
 		return;
 
-  displayImage = baseImage;
+  displayImage = baseImage; //May need to be replaced by deep copy
+  if( paintingCentroidClass )
+    this->repaintCentroids(0);
   QPainter painter(&displayImage);
 
   int oldX = scrollArea->horizontalScrollBar()->value();
@@ -213,8 +221,71 @@ void MontageDiplayArea::paintEvent(QPaintEvent * event)
   scrollArea->verticalScrollBar()->setValue(oldY);
 }
 
+void MontageDiplayArea::repaintCentroids( itk::SizeValueType numPointsToPaint = 0 )
+{
+  if( !numPointsToPaint )
+    numPointsToPaint = centroidPoints.size();
+    unsigned char *buf = displayImage.bits();
+  const ftk::Image::Info *info = channelImg->GetImageInfo();
+#ifdef _OPENMP
+  #pragma omp parallel for
+#if _OPENMP < 200805L
+  for( itk::IndexValueType i=0; i<numPointsToPaint; ++i )
+#else
+  for(  itk::SizeValueType i=0; i<numPointsToPaint; ++i )
+#endif
+#else
+  for(  itk::SizeValueType i=0; i<numPointsToPaint; ++i )
+#endif
+  {	
+    QImage myImg = QImage(buf, (*info).numColumns, (*info).numRows, QImage::Format_ARGB32_Premultiplied);
+    QPainter painter(&myImg);
+    int x = centroidPoints.at( centroidPoints.size()-i-1 ).first;
+    int y = centroidPoints.at( centroidPoints.size()-i-1 ).second;
+    painter.setBrush(paintCentroidsColor);
+    painter.drawEllipse(x-1, y-1, 2, 2);
+  }
+}
+
 void MontageDiplayArea::SetChannelFlags( std::vector<bool> chFlags )
 {
   channelFlags = chFlags;
   refreshBaseImage();
+}
+
+void MontageDiplayArea::respondToSlider(
+	std::vector< std::pair<itk::SizeValueType,itk::SizeValueType> > &paintPoints,
+	QColor &paintColor, unsigned &displayChannel )
+{
+  paintingCentroidClass = true;
+  if( displayChannel || paintPoints.size()<centroidPoints.size() )
+  //Display image needs to reset if channels are changed or some centroids need to be erased
+  {
+    numPointsToPaint = 0; //Need to repaint all in vector
+    paintCentroidsColor = paintColor;
+    centroidPoints = paintPoints;
+    if( displayChannel )
+    //Channel changing base image needs to be repainted
+    {
+      for( unsigned i=0; i<channelFlags.size(); ++i )
+	if( (displayChannel-1)==i )
+	  channelFlags.at(i) = true;
+	else
+	  channelFlags.at(i) = false;
+      refreshBaseImage();
+    }
+    else
+    //Just need to delete all centroids and repaint them
+    {
+      displayImage = baseImage; //May need to be replaced by deep copy
+      this->repaintCentroids();
+    }
+  }
+  else
+  //Just adding points to base image
+  {
+    numPointsToPaint = paintPoints.size()-centroidPoints.size();
+    centroidPoints = paintPoints;
+    this->repaintCentroids( numPointsToPaint );
+  }
 }

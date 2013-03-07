@@ -51,6 +51,7 @@ signals:
 protected:
   virtual void closeEvent(QCloseEvent *event);
   MontageDiplayArea *imageViewer;
+  CellTypingDialog *cellTypingDialog;
 
 protected slots:
   void loadProject(void);
@@ -63,6 +64,8 @@ protected slots:
   void enableRegionSelButton(bool);
   void cropRegion(void);
   void processProject(void);
+  void LaunchCellTypingWindow(void);
+  void cellTypingDialogClosing(void);
 
 private:
   typedef itk::Image<unsigned short, 3> NucleusEditorLabelType;
@@ -84,6 +87,7 @@ private:
   double scaleFactor;
   itk::SizeValueType NumberOfLabelsFound;
   int nucChannel;
+  CellTypingDialog *cellTypeDialog;
 
   template<typename pixelType> NucleusEditorLabelType::Pointer
   				RelabelImage(ftk::Image::Pointer InputImage);
@@ -93,6 +97,7 @@ private:
   std::map< itk::SizeValueType, itk::SizeValueType > LabelToRelabelMap;
   std::map<int, ftk::Object::Point> CroppedCentroidsMap;
   std::map<int, ftk::Object::Box> CroppedBoundBoxesMap;
+  std::vector< std::vector <std::string> > ClassificationGroups;
 
   //Utility functions
   vtkSmartPointer<vtkTable> GetCroppedTable( itk::SizeValueType x1, itk::SizeValueType y1,
