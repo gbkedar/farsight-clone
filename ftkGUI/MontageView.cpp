@@ -113,6 +113,13 @@ void MontageView::createMenus()
   displayChannelMenu->setObjectName("displayChannelMenu");
   connect(displayChannelMenu, SIGNAL(aboutToShow()), this, SLOT(DisplayChannelsMenu()));
 
+  //TOOLS MENU
+  toolsMenu = menuBar()->addMenu(tr("&Tools"));
+  toolsMenu->setObjectName("toolsMenu");
+  cellTypeDialogMenu = viewMenu->addMenu(tr("Launch Cell Type Dialog"));
+  cellTypeDialogMenu->setObjectName("cellTypeDialogMenu");
+  connect(cellTypeDialogMenu, SIGNAL(triggered()), this, SLOT(DisplayChannelsMenu()));
+
 }
 
 void MontageView::createToolBar()
