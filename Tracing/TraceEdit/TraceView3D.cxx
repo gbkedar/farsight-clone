@@ -4537,7 +4537,7 @@ void View3D::FakeSpines(double d)
 }
 void View3D::FakeBridges(double d)
 {
-	int numLines;
+	itk::SizeValueType numLines;
 	if(this->flag==1)
 	{
 		this->flag=0;
@@ -4557,7 +4557,7 @@ void View3D::FakeBridges(double d)
 
 void View3D::HalfBridges(double d)
 {
-	int numLines;
+	itk::SizeValueType numLines;
 	if(this->flag==1)
 	{
 		this->flag=0;
@@ -5241,7 +5241,7 @@ void View3D::MergeTraces()
 			}
 			else if (MergeInfo.clickedButton()==mergeAll)
 			{
-				unsigned int num = this->tobj->Gaps.size();
+				itk::SizeValueType num = this->tobj->Gaps.size();
 				this->numMerged += num;
 				this->EditLogDisplay->append("Merged " + 
 					QString::number(num) + " traces");
@@ -6016,7 +6016,7 @@ void View3D::SaveProjectFile()
 		{
 			project->addFile(this->tempTraceFile.last().toStdString(), "Trace", 0,0,0);
 		}
-		for (unsigned int i = 0; i < this->TraceFiles.size(); i++)
+		for (unsigned i = 0; i < this->TraceFiles.size(); i++)
 		{
 			std::string traceFile = this->TraceFiles.at(i).toStdString();
 			project->addFile(traceFile, "Trace", 0,0,0);

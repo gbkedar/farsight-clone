@@ -258,10 +258,5 @@ void CellTypingDialog::featureSliderChange(unsigned val, unsigned ch, unsigned a
 
 void CellTypingDialog::closeEvent(QCloseEvent *event)
 {
-/*  disconnect( this,
-  	SIGNAL( thresholdChanged( std::vector< std::pair<itk::SizeValueType,itk::SizeValueType> >, QColor, unsigned ) ),
-	parent->imageViewer,
-	SLOT( respondToSlider( std::vector< std::pair<itk::SizeValueType,itk::SizeValueType> >, QColor, unsigned ) ) );
-	*/ // **********HAS TO MOVE TO PARENT CLASS************
 	emit closing();
 }

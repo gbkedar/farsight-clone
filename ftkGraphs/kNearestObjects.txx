@@ -172,9 +172,9 @@ std::vector< std::pair<unsigned int, double> > kNearestObjects<num_dimensions>::
 
 		kNearestIds.push_back( std::make_pair(id,0) );
 	
-		int count = 0;
-		unsigned int num_neighbors = k+1;
-		int increment = 10;
+		unsigned count = 0;
+		unsigned num_neighbors = k+1;
+		unsigned increment = 10;
 		typename TreeType::InstanceIdentifierVectorType temp_vector;
 		
 		// repeat till the number of nearest neighbors is greater than or equal to k

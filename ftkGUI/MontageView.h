@@ -126,6 +126,9 @@ protected:
   QVector<QAction *> displayChannelAction;
   QString standardImageTypes;
 
+  QMenu *toolsMenu;
+  QMenu *cellTypeDialogMenu;
+
   QPushButton *cropButton;
   QToolBar *toolbar;
   QString lastPath;

@@ -24,6 +24,9 @@
 #include <algorithm>
 #include <iostream>
 
+//ITK Includes
+#include <itkIntTypes.h> 
+
 #define MAX(a,b) (((a) > (b))?(a):(b))
 #define MIN(a,b) (((a) < (b))?(a):(b))
 
@@ -73,8 +76,8 @@ public:
 	bool stop_training;
 	vnl_vector<double> stop_cond;	
 	double delta; 	
-	int no_of_features;
-	int no_of_classes;
+	unsigned no_of_features;
+	unsigned no_of_classes;
 	int current_label;
 
 	double max_info;

@@ -17,15 +17,15 @@ MCLR_SM::~MCLR_SM()
 // y contains the training labels
 void MCLR_SM::Initialize(vnl_matrix<double> data,double c,vnl_vector<double> classes, std::string str,vtkSmartPointer<vtkTable> table )
 {
-	int train_counter =0;
-	int test_counter = 0;
+	itk::SizeValueType train_counter =0;
+	itk::SizeValueType test_counter = 0;
 	validation = str;
 	
 	// test_table contains the table after the queried samples are removed from the original table
 	// It is updated in the Update_Train_data 
 	test_table = table;
 	
-	for(int i = 0; i< classes.size() ; ++i)
+	for(itk::SizeValueType i = 0; i< classes.size() ; ++i)
 	{
 		if(classes(i) == -1)
 			test_counter++;
@@ -36,7 +36,7 @@ void MCLR_SM::Initialize(vnl_matrix<double> data,double c,vnl_vector<double> cla
 	
 	test_counter = 0;
 
-	for(int i= 0;i<data.rows();++i)
+	for(itk::SizeValueType i= 0;i<data.rows();++i)
 	{
 		if(classes(i)!=-1)
 		{	
@@ -57,8 +57,8 @@ void MCLR_SM::Initialize(vnl_matrix<double> data,double c,vnl_vector<double> cla
 	// Transpose : Features->Rows ; Samples -> Columns
 	x = train_data.transpose();// Feature matrix of training samples only ; does not contain unlabeled sample data
 	
-	int counter = 0;
-	for(int i = 0; i < classes.size(); ++i)
+	unsigned counter = 0;
+	for(unsigned i = 0; i < classes.size(); ++i)
 	{
 		if(classes(i)!=-1)
 		{
@@ -95,7 +95,7 @@ void MCLR_SM::Initialize(vnl_matrix<double> data,double c,vnl_vector<double> cla
 	// g :the objective function value
 	g = 0;
 	// Class vector
-	for(int i=1;i<=no_of_classes;++i)
+	for(unsigned i=1;i<=no_of_classes;++i)
 	{
 		class_vector.put(i-1,i); 
 	}
@@ -156,7 +156,7 @@ vnl_matrix <double> MCLR_SM::Normalize_Feature_Matrix(vnl_matrix<double> feats)
 {
 	mbl_stats_nd stats;
 
-	for(int i = 0; i<feats.rows() ; ++i)
+	for(itk::SizeValueType i = 0; i<feats.rows() ; ++i)
 	{
 		vnl_vector<double> temp_row = feats.get_row(i);
 		stats.obs(temp_row);	
@@ -167,12 +167,12 @@ vnl_matrix <double> MCLR_SM::Normalize_Feature_Matrix(vnl_matrix<double> feats)
 	
 
 //The last column is the training column 
-	for(int i = 0; i<feats.columns() ; ++i)
+	for(itk::SizeValueType i = 0; i<feats.columns() ; ++i)
 	{
 		vnl_vector<double> temp_col = feats.get_column(i);
 		if(std_vec(i) > 0)
 		{	
-			for(int j =0; j<temp_col.size() ; ++j)
+			for(itk::SizeValueType j =0; j<temp_col.size() ; ++j)
 				temp_col[j] = (temp_col[j] - mean_vec(i))/std_vec(i) ;
 		}
 	
@@ -189,12 +189,12 @@ vnl_matrix <double> MCLR_SM::Normalize_Feature_Matrix_1(vnl_matrix<double> feats
 	
 
 //The last column is the training column 
-	for(int i = 0; i<feats.columns() ; ++i)
+	for(itk::SizeValueType i = 0; i<feats.columns() ; ++i)
 	{
 		vnl_vector<double> temp_col = feats.get_column(i);
 		if(std_vec(i) > 0)
 		{	
-			for(int j =0; j<temp_col.size() ; ++j)
+			for(itk::SizeValueType j =0; j<temp_col.size() ; ++j)
 				temp_col[j] = (temp_col[j] - mean_vec(i))/std_vec(i) ;
 		}
 	
@@ -210,9 +210,9 @@ vnl_matrix<double> MCLR_SM::Get_F_Matrix(vnl_matrix<double> data_bias,vnl_matrix
 	vnl_matrix<double> epow_matrix = w_temp.transpose()*data_bias;
 	vnl_matrix<double> temp_f;
 	temp_f.set_size(epow_matrix.rows(),epow_matrix.cols());
-	for(int i=0;i<epow_matrix.rows();++i)
+	for(itk::SizeValueType i=0;i<epow_matrix.rows();++i)
 	{
-	  for(int j=0;j<epow_matrix.cols();++j)
+	  for(itk::SizeValueType j=0;j<epow_matrix.cols();++j)
 	   {
 		  temp_f(i,j) = exp(epow_matrix(i,j));
 	  }
@@ -230,10 +230,10 @@ vnl_matrix<double> MCLR_SM::Normalize_F_Sum(vnl_matrix<double> f)
 	norm_matrix_row.set_size(f.cols());
 	
 	 //repmat(sum(f,1),[classN,1]);
-	for(int i=0;i<f.cols();++i)
+	for(itk::SizeValueType i=0;i<f.cols();++i)
 	{
       double sum = 0 ;  
-	  for(int j=0;j<no_of_classes;++j)
+	  for(unsigned j=0;j<no_of_classes;++j)
 		{
 			sum = sum + f(j,i);
 		}
@@ -241,15 +241,15 @@ vnl_matrix<double> MCLR_SM::Normalize_F_Sum(vnl_matrix<double> f)
 	}
 
 
-    for(int i=0;i<no_of_classes;++i)
+    for(unsigned i=0;i<no_of_classes;++i)
 	{
 		norm_matrix.set_row(i,norm_matrix_row); 
 	}
 
 // f  = f./repmat(sum(f,1),[classN,1]);
-	for(int i=0;i<f.rows();++i)
+	for(itk::SizeValueType i=0;i<f.rows();++i)
 	{
-	  for(int j=0;j<f.cols();++j)
+	  for(itk::SizeValueType j=0;j<f.cols();++j)
 	   {
 		  f(i,j) = f(i,j)/norm_matrix(i,j);
 	   }
@@ -305,9 +305,9 @@ void MCLR_SM::Get_Gradient(vnl_matrix<double> data_with_bias)
 	vnl_matrix<double> abs_w; //
 	abs_w.set_size(no_of_features+1,no_of_classes);
 	
-	for(int i=0;i<no_of_features+1;++i)
+	for(unsigned i=0;i<no_of_features+1;++i)
 	{
-	  for(int j=0;j<no_of_classes;++j)
+	  for(unsigned j=0;j<no_of_classes;++j)
 	   {
 		 abs_w(i,j) = m.w(i,j)/ sqrt((m.w(i,j))*(m.w(i,j)) + delta);
 	  }
@@ -332,7 +332,7 @@ vnl_matrix<double> MCLR_SM::Add_Bias(vnl_matrix<double> data)
 	
 	data_with_bias.set_size(no_of_features+1,data.cols());
 	data_with_bias.set_row(0,temp_vector);
-	for(int i =0; i<no_of_features ; ++i)
+	for(unsigned i =0; i<no_of_features ; ++i)
 	{
 		data_with_bias.set_row(i+1,data.get_row(i));	
 	}
@@ -350,11 +350,11 @@ void MCLR_SM::Get_Hessian(vnl_matrix<double> data_with_bias)
 	vnl_matrix<double> temp_hessian; // temporary Hessian Matrix
 	temp_hessian.set_size((no_of_features+1)*(no_of_classes),(no_of_features+1)*(no_of_classes));
 
-	for(int i = 1; i<=no_of_classes ;++i)
+	for(unsigned i = 1; i<=no_of_classes ;++i)
 	{
 		vnl_vector<double> ith_row  = f.get_row(i-1);
 
-		for(int j = 0; j< x.cols() ; ++j)
+		for(itk::SizeValueType j = 0; j< x.cols() ; ++j)
 		{
 			ith_row(j) = ith_row(j)*(1-ith_row(j));
 		}
@@ -372,25 +372,25 @@ void MCLR_SM::Get_Hessian(vnl_matrix<double> data_with_bias)
 			
 		vnl_vector<int> all_class_but_i;
 		all_class_but_i.set_size(class_vector.size()-1);
-		int counter = 0;
+		unsigned counter = 0;
 
-		for(int k = 0; k< class_vector.size() ; ++k)
+		for(unsigned k = 0; k< class_vector.size() ; ++k)
 		{	
 			if(class_vector(k)!=i)
 			{			
 				all_class_but_i.put(counter,class_vector(k));
-				counter ++;
+				++counter;
 			}
 		}	
 
 		//for(int k = 0; k< class_vector.size() ; ++k)
 		//	std::cout<<class_vector(k)<<"--------------"<<std::endl;
 		
-		for(int k = 0; k< all_class_but_i.size() ; ++k)
+		for(unsigned k = 0; k< all_class_but_i.size() ; ++k)
 		{	
 			ith_row  = f.get_row(i-1);
 			vnl_vector<double> kth_row  = f.get_row(all_class_but_i(k)-1);
-			for(int j = 0; j< x.cols() ; ++j)
+			for(unsigned j = 0; j< x.cols() ; ++j)
 			{
 			//f(i,:).*(-f(k,:))
 				ith_row(j) = ith_row(j)*(-kth_row(j));
@@ -408,9 +408,9 @@ void MCLR_SM::Get_Hessian(vnl_matrix<double> data_with_bias)
 		vnl_vector<double> w_column_ordered = Column_Order_Matrix(m.w);
 		
 		int count = 0;
-		for(int i=0;i<m.w.rows();++i)
+		for(itk::SizeValueType i=0;i<m.w.rows();++i)
 		{
-		  for(int j=0;j<m.w.cols();++j)	
+		  for(itk::SizeValueType j=0;j<m.w.cols();++j)	
 		  {
 			w_column_ordered(count) = (m.sparsity_control)*(delta/pow(sqrt(pow(w_column_ordered(count),2)+delta),3));
 			count++;
@@ -454,7 +454,7 @@ void MCLR_SM::Ameliorate_Hessian_Conditions()
 double MCLR_SM::Compute_Mean_Abs_Eig(vnl_symmetric_eigensystem<double> eig)
 {
 	double sum = 0; 	
-	for(int i =0; i<(no_of_features+1)*(no_of_classes);++i)
+	for(itk::SizeValueType i =0; i<(no_of_features+1)*(no_of_classes);++i)
 	{
 		sum = sum + fabs(eig.get_eigenvalue(i));
 	}	
@@ -469,9 +469,9 @@ vnl_vector<double> MCLR_SM::Column_Order_Matrix(vnl_matrix<double> mat)
 		mat_column_ordered.set_size(mat.rows()*mat.cols());
 		int count = 0;
 
-		for(int j=0;j<mat.cols();++j)	
+		for(itk::SizeValueType j=0;j<mat.cols();++j)	
 		{
-		for(int i=0;i<mat.rows();++i)
+		for(itk::SizeValueType i=0;i<mat.rows();++i)
 		{
 			mat_column_ordered(count) = mat(i,j);
 			count++;
@@ -696,13 +696,13 @@ double MCLR_SM::logit_g(double alpha,vnl_matrix<double> data_with_bias)
 	vnl_vector<double> f_vec(f.cols(),0);
 
 	// Get the denominator
-	for(int i=0;i<f.cols();++i)
+	for(unsigned i=0;i<f.cols();++i)
 	{
 	  vnl_vector<double> temp_col = f.get_column(i);
 	  denominator(i) = temp_col.sum();	
 	}
 	
-	for(int i=0;i<f.cols();++i)
+	for(unsigned i=0;i<f.cols();++i)
 	{
 	  vnl_vector<double> temp_col = f.get_column(i);
 	  f_vec(i) = temp_col(y(i)-1)/denominator(i);
@@ -712,7 +712,7 @@ double MCLR_SM::logit_g(double alpha,vnl_matrix<double> data_with_bias)
 	}
 	
 	// Objective function value
-	for(int i=0;i<f_vec.size();++i)
+	for(itk::SizeValueType i=0;i<f_vec.size();++i)
 	{
 		gVal = gVal+log(f_vec(i));
 	}
@@ -724,9 +724,9 @@ double MCLR_SM::logit_g(double alpha,vnl_matrix<double> data_with_bias)
 	//g = g - C*sum(sum(sqrt(w.^2+delta)));   % consider the sparseness penalty 
 	double diff_term =0;
 
-	for(int i=0;i<no_of_features+1;++i)
+	for(unsigned i=0;i<no_of_features+1;++i)
 	{
-	  for(int j=0;j<no_of_classes;++j)
+	  for(unsigned j=0;j<no_of_classes;++j)
 	   {
 		 diff_term += sqrt(w_temp(i,j)*w_temp(i,j)+delta);
 	  }
@@ -746,7 +746,7 @@ std::vector<int> MCLR_SM::Get_Top_Features()
     std::vector<std::pair<double, int> > val_idx; // value and index
 
 	// find the maximum in each row
-	for(int i = 1; i< m.w.rows() ; ++i)
+	for(unsigned i = 1; i< m.w.rows() ; ++i)
 	{
 		vnl_vector<double> temp_row = m.w.get_row(i);
 		val_idx.push_back(std::pair<double, int>(temp_row.max_value(),i-1));
@@ -779,7 +779,7 @@ MCLR_SM::model MCLR_SM::Get_Training_Model()
 	 
 
 	// Create the z matrix
-	for(int i=0;i<x.cols();++i)
+	for(unsigned i=0;i<x.cols();++i)
 	{
 		vnl_vector<double> temp_vector = z.get_column(i);
 		temp_vector.put(y.get(i)-1,1);
@@ -962,8 +962,8 @@ vnl_matrix<double> MCLR_SM::Kron(vnl_vector<double> x,vnl_vector<double> y )
 {
 	vnl_matrix<double> q(x.size()*y.size(),1);
 	int counter = 0;
-	for(int j = 0; j < x.size() ; ++j)
-		for(int k = 0; k < y.size() ; ++k)	
+	for(itk::SizeValueType j = 0; j < x.size() ; ++j)
+		for(itk::SizeValueType k = 0; k < y.size() ; ++k)	
 			{
 				q(counter,0) = x(j)*y(k);
 				counter++;
@@ -999,7 +999,7 @@ int MCLR_SM::Active_Query()
 	vnl_vector<double> info_vector(test_data_just_features.cols());
 
 	//Compute Information gain
-	for(int i =0; i< test_data_just_features.cols();++i )
+	for(unsigned i =0; i< test_data_just_features.cols();++i )
 	{
 		vnl_vector<double> temp_col_prob = prob.get_column(i);
 		vnl_vector<double> temp_col_data = test_data_bias.get_column(i);		
