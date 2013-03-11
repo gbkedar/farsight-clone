@@ -159,7 +159,7 @@ void BiTree::InitialLevelId()
 {
 	this->levels.numm_levels = 0;
 	this->levels.level_id.resize(1);
-	for(int i = 0; i < this->num_rows; i ++)
+	for(itk::SizeValueType i = 0; i < this->num_rows; i ++)
 	{
 		std::vector<int > temp;
 		temp.push_back(i);
@@ -169,12 +169,12 @@ void BiTree::InitialLevelId()
 
 void BiTree::append(std::vector<std::vector<double > > & datatobekmeans)
 {
-	int p = datatobekmeans.size();
-	for(int i = 0; i < p; i++)
+	itk::SizeValueType p = datatobekmeans.size();
+	for(itk::SizeValueType i = 0; i < p; i++)
 	{
 		std::vector<double > temp;
 		temp.resize(this->num_cols_original);
-		for(int j = 0; j < this->num_cols_original; j++)
+		for(itk::SizeValueType j = 0; j < this->num_cols_original; j++)
 		{
 			temp[j] = datatobekmeans[i][j];
 		}
@@ -238,13 +238,13 @@ Level_id BiTree::getLevels()
 void BiTree::reOrder(std::vector<std::vector<double > > submatrix, std::vector<int > & ctp)
 {
 	double** data;
-	int nrow = submatrix.size();
-	int ncol = submatrix[0].size();
+	itk::SizeValueType nrow = submatrix.size();
+	itk::SizeValueType ncol = submatrix[0].size();
 	data = new double* [nrow];
-	for(int i = 0; i < nrow; i++)
+	for(itk::SizeValueType i = 0; i < nrow; i++)
 	{
 		data[i] = new double [ncol];
-		for(int j = 0; j < ncol; j++)
+		for(itk::SizeValueType j = 0; j < ncol; j++)
 			data[i][j] = submatrix[i][j];
 	}
 
@@ -253,12 +253,12 @@ void BiTree::reOrder(std::vector<std::vector<double > > submatrix, std::vector<i
 	std::cout<<"Finish clusclus now! "<<std::endl;
 
 	std::vector<int > temp;
-	for(int i = 0; i < nrow; i++)
+	for(itk::SizeValueType i = 0; i < nrow; i++)
 		temp.push_back(ctp[cc->optimalleaforder[i]]);
 
 	ctp = temp;
 
-	for(int i = 0; i < nrow; i++)
+	for(itk::SizeValueType i = 0; i < nrow; i++)
 	{
 		delete data[i];
 	}
@@ -277,23 +277,23 @@ void BiTree::normalize(std::vector<std::vector<double > > datatobenormalized, st
 	int numc = datatobenormalized[0].size();
 	normalized.resize (numr);
 
-	for(int j = 0; j < numc; j++)
+	for(itk::SizeValueType j = 0; j < numc; j++)
 	{
 		double mean = 0.0;
-		for(int i = 0; i < numr; i++)
+		for(itk::SizeValueType i = 0; i < numr; i++)
 		{
 			mean += datatobenormalized[i][j];
 		}
 		mean /= numr;
 
 		double sum = 0.0;
-		for(int i = 0; i < numr; i++)
+		for(itk::SizeValueType i = 0; i < numr; i++)
 		{
 			sum += ( datatobenormalized[i][j] - mean ) * ( datatobenormalized[i][j] - mean );
 		}
 		double std = sqrt(sum / numr);
 
-		for(int i = 0; i < numr; i++)
+		for(itk::SizeValueType i = 0; i < numr; i++)
 		{
 			normalized[i].push_back ((datatobenormalized[i][j] - mean) / std);
 		}

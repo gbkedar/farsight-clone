@@ -49,7 +49,7 @@ void DiffusionMap::Initialize(vtkSmartPointer< vtkTable > tbl, bool val)
 
 	mbl_stats_nd stats;
 	
-	for(int i = 0; i<temp.rows() ; ++i)
+	for(unsigned i = 0; i<temp.rows() ; ++i)
 	{
 		vnl_vector<double> temp_row = temp.get_row(i);
 		stats.obs(temp_row);	
@@ -58,14 +58,14 @@ void DiffusionMap::Initialize(vtkSmartPointer< vtkTable > tbl, bool val)
 	vnl_vector<double> std_vec = stats.sd();
 	vnl_vector<double> mean_vec = stats.mean();
 	
-	data_matrix.set_size((int)featureTable->GetNumberOfRows(), (int)featureTable->GetNumberOfColumns()-1);
+	data_matrix.set_size(featureTable->GetNumberOfRows(), featureTable->GetNumberOfColumns()-1);
 
-	for(int i = 0; i<temp.columns() ; ++i)
+	for(unsigned i = 0; i<temp.columns() ; ++i)
 	{
 		vnl_vector<double> temp_col = temp.get_column(i);
 		if(std_vec(i) > 0)
 		{	
-			for(int j =0; j<temp_col.size() ; ++j)
+			for(unsigned j =0; j<temp_col.size() ; ++j)
 				temp_col[j] = (temp_col[j] - mean_vec(i))/std_vec(i) ;
 		}
 		data_matrix.set_column(i,temp_col);
@@ -152,7 +152,7 @@ void DiffusionMap::ComputeDiffusionMap(void)
 	
 	vnl_matrix<vcl_complex<double> > EVals = Eyegun.D;
 	vnl_vector<double> temp_vec(similarity_matrix.rows());
-	for(int row=0; row<EVals.rows(); ++row)
+	for(unsigned row=0; row<EVals.rows(); ++row)
 	{
 		temp_vec(row) = vnl_real(EVals)(row,row);
 	}

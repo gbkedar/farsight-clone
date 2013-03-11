@@ -118,7 +118,7 @@ void MontageView::createMenus()
   toolsMenu->setObjectName("toolsMenu");
   cellTypeDialogMenu = viewMenu->addMenu(tr("Launch Cell Type Dialog"));
   cellTypeDialogMenu->setObjectName("cellTypeDialogMenu");
-  connect(cellTypeDialogMenu, SIGNAL(triggered()), this, SLOT(DisplayChannelsMenu()));
+  connect(cellTypeDialogMenu, SIGNAL(triggered()), this, SLOT(LaunchCellTypingWindow()));
 
 }
 
@@ -486,7 +486,7 @@ vtkSmartPointer<vtkTable> MontageView::GetCroppedTable( itk::SizeValueType x1, i
     cropTable->SetValueByName( i, "centroid_y", CurrentCentroid.y );
     CurrentCentroid.z = TableEntryVector.at( it1->second ).z;
     CroppedCentroidsMap[ it->second ] = CurrentCentroid;
-    itk::SizeValueType XMin, YMin, ZMin, XMax, YMax, ZMax;
+    itk::SizeValueType XMin, YMin, XMax, YMax;
     XMin = BoundingBoxes.at(it1->second).at(0); XMax = BoundingBoxes.at(it1->second).at(1);
     YMin = BoundingBoxes.at(it1->second).at(2); YMax = BoundingBoxes.at(it1->second).at(3);
     CurrentMin.z = BoundingBoxes.at(it1->second).at(4);
@@ -773,7 +773,6 @@ void MontageView::LaunchCellTypingWindow()
 	NewStringVector.push_back( ascit->GetRuleName() );
 	ClassificationGroups.push_back( NewStringVector );
         GroupChannelNumbers.push_back( 0 );
-	unsigned j;
 	for( unsigned j=0; j<projectDefinition.inputs.size(); ++j )
 	{
 	  if( ascit->GetTargetFileNmae().compare( projectDefinition.inputs.at(j).name )==0 )
@@ -782,7 +781,8 @@ void MontageView::LaunchCellTypingWindow()
 	    break;
 	  }
 	}
-	if( ascit->GetTargetFileNmae().compare( projectDefinition.inputs.at(j).name )!=0 )
+	if( ascit->GetTargetFileNmae().compare
+			(projectDefinition.inputs.at(projectDefinition.inputs.size()-1).name ) !=0 )
 	  std::cout << "Target image " << ascit->GetTargetFileNmae()
 		<< " did not match any of the input images. Setting to channel 0.\n";
       }
@@ -802,15 +802,15 @@ void MontageView::LaunchCellTypingWindow()
   cellTypeDialog = new CellTypingDialog( GroupChannelNumbers, Table, ClassificationGroups,
 				GroupNames, DownSampledCoords, this );
   cellTypeDialog->show();
-  connect( cellTypeDialog,
-  	SIGNAL( thresholdChanged( std::vector< std::pair<itk::SizeValueType,itk::SizeValueType> >, QColor, unsigned ) ),
-	imageViewer,
-	SLOT( respondToSlider( std::vector< std::pair<itk::SizeValueType,itk::SizeValueType> >, QColor, unsigned ) ) );
   connect( cellTypeDialog, SIGNAL( closing() ), this, SLOT( cellTypingDialogClosing() ) );
 }
 
 void MontageView::cellTypingDialogClosing()
 {
   cellTypeDialog = NULL;
+  disconnect( cellTypeDialog,
+  	SIGNAL( thresholdChanged( std::vector< std::pair<itk::SizeValueType,itk::SizeValueType> >, QColor, unsigned ) ),
+	imageViewer,
+	SLOT( respondToSlider( std::vector< std::pair<itk::SizeValueType,itk::SizeValueType> >, QColor, unsigned ) ) );
   imageViewer->paintingCentroidClass = false;
 }

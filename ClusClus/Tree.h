@@ -4,6 +4,7 @@
 #include "Kmeans.h"
 #include "clusclus.h"
 #include "LocalGeometryRef.h"
+#include "itkIntTypes.h"
 
 typedef struct 
 {
@@ -30,10 +31,10 @@ public:
 
 private:
 	int firstK;
-	int num_rows;
-	int num_cols;
-	int num_rows_original;
-	int num_cols_original;
+	itk::SizeValueType num_rows;
+	itk::SizeValueType num_cols;
+	itk::SizeValueType num_rows_original;
+	itk::SizeValueType num_cols_original;
 
 	Level_id levels;
 	std::vector<std::vector<double > > matrix;
