@@ -127,7 +127,7 @@ protected:
   QString standardImageTypes;
 
   QMenu *toolsMenu;
-  QMenu *cellTypeDialogMenu;
+  QAction *cellTypeDialogMenu;
 
   QPushButton *cropButton;
   QToolBar *toolbar;
