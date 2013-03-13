@@ -116,10 +116,11 @@ void MontageView::createMenus()
   //TOOLS MENU
   toolsMenu = menuBar()->addMenu(tr("&Tools"));
   toolsMenu->setObjectName("toolsMenu");
-  cellTypeDialogMenu = viewMenu->addMenu(tr("Launch Cell Type Dialog"));
-  cellTypeDialogMenu->setObjectName("cellTypeDialogMenu");
-  connect(cellTypeDialogMenu, SIGNAL(triggered()), this, SLOT(LaunchCellTypingWindow()));
 
+  cellTypeDialogMenu = new QAction(tr("Launch Cell Type Dialog"), this);
+  cellTypeDialogMenu->setObjectName("cellTypeDialogMenu");
+  cellTypeDialogMenu->setStatusTip(tr("Launch the cell typing widget"));
+  connect(cellTypeDialogMenu, SIGNAL(triggered()), this, SLOT(LaunchCellTypingWindow()));
 }
 
 void MontageView::createToolBar()

@@ -296,7 +296,7 @@ template <typename LabelPixelType>  void
   OutputLabelImage->FillBuffer(0);
   OutputLabelImage->Update();
 
-  itk::SizeValueType NumFilesToStitch = TempSegFiles.size();
+  itk::SizeValueType NumFilesToStitch = TempSegFiles.size()-1; //Binary appended at the end
   LabelPixelType NumLabelsUsed = 1;
 #ifdef _OPENMP
    #pragma omp parallel for num_threads(n_thr) \
@@ -371,6 +371,13 @@ template <typename LabelPixelType>  void
     {
       std::cout << "Error in removing file. " << ex.what() << '\n';
     }
+  }
+  //Remove binary
+  boost::filesystem::path RemoveFile = TempSegFiles.back().c_str();
+  try{ boost::filesystem::remove( RemoveFile ); }
+  catch( const boost::filesystem::filesystem_error& ex )
+  {
+    std::cout << "Error in removing file. " << ex.what() << '\n';
   }
 
 #if 0
