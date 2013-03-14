@@ -251,13 +251,17 @@ void MontageView::loadProject()
       Table = NULL;
     return;
   }
+
+  Table = ftk::LoadTable( projectFiles.GetFullTable() );
+
   this->computeBoundBoxesAndTableMapsForDisplay();
+
   return;
 }
 
 void MontageView::computeBoundBoxesAndTableMapsForDisplay()
 {
-  std::cout<<"Computing label stats for the label image\n";
+  std::cout<<"Computing label stats for the label image\n"<<std::flush;
 
   LabelStatisticsImageFilterType::Pointer LabelStats = LabelStatisticsImageFilterType::New();
   LabelStats->SetInput( LabelImage->GetItkPtr<unsigned int>(0,0) );
@@ -272,6 +276,7 @@ void MontageView::computeBoundBoxesAndTableMapsForDisplay()
   {
     std::cerr << "Error in Label Image stats" << excp << std::endl;
   }
+  std::cout<<"Label stats computed for GUI. Getting bounding boxes.\n"<<std::flush;
   for( LabelStatisticsImageFilterType::ValidLabelValuesContainerType::const_iterator
 	  it = LabelStats->GetValidLabelValues().begin()+1;/*Since label 0 counted*/
 	it != LabelStats->GetValidLabelValues().end(); ++it )
@@ -280,7 +285,6 @@ void MontageView::computeBoundBoxesAndTableMapsForDisplay()
     BoundingBoxes.push_back( bb );
   }
 
-  Table = ftk::LoadTable( projectFiles.GetFullTable() );
   if( !Table || ( Table->GetNumberOfRows() != BoundingBoxes.size() ) )
   {
     if( Table->GetNumberOfRows() != BoundingBoxes.size() )
@@ -296,6 +300,8 @@ void MontageView::computeBoundBoxesAndTableMapsForDisplay()
       BoundingBoxes.clear();
     return;
   }
+
+  std::cout<<"Mapping label and table entries.\n"<<std::flush;
 
   for( itk::SizeValueType i=0; i<Table->GetNumberOfRows(); ++i )
   {
@@ -321,6 +327,10 @@ void MontageView::computeBoundBoxesAndTableMapsForDisplay()
     LabelToTableMap.insert(std::map<itk::SizeValueType, itk::SizeValueType>::value_type
     				( CurrentEntry.LabelImId, i ) );
   }
+
+  std::cout<<"Done! GUI will be ready in a moment.\n"<<std::flush;
+
+  return;
 }
 
 void MontageView::cropRegion()

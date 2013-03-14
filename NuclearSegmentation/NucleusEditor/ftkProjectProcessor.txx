@@ -266,7 +266,7 @@ template <typename InputPixelType, typename LabelPixelType>  void
 	itk::MultiThreader::SetGlobalDefaultNumberOfThreads(n_thr);
 #endif
 
-	std::cout<<"Features for the montage done with "<<table->GetNumberOfRows()<<" labels\n";
+	std::cout<<"Features for the montage done with "<<table->GetNumberOfRows()<<" labels\n"<<std::flush;
 
 	return;
 }
