@@ -132,7 +132,7 @@ template <typename InputPixelType, typename LabelPixelType>  void
 #ifdef _OPENMP
 	//Use 95% of the cores by default n save a little for the OS
 	if(!numThreadsSet) n_thr = 0.95*omp_get_max_threads();
-	itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
+	itk::MultiThreader::SetGlobalDefaultNumberOfThreads(1);
 	std::cout<<"Using "<<n_thr<<" threads\n"<<std::flush;
 #if _OPENMP >= 200805L
 	omp_set_max_active_levels(1);
@@ -263,7 +263,7 @@ template <typename InputPixelType, typename LabelPixelType>  void
 	}
 
 #ifdef _OPENMP
-	itk::MultiThreader::SetGlobalMaximumNumberOfThreads(n_thr);
+	itk::MultiThreader::SetGlobalDefaultNumberOfThreads(n_thr);
 #endif
 
 	std::cout<<"Features for the montage done with "<<table->GetNumberOfRows()<<" labels\n";

@@ -106,6 +106,7 @@ private:
   itk::SizeValueType CheckBoundsAndSubtractMin( itk::SizeValueType CoOrd,
   					itk::SizeValueType Min, itk::SizeValueType Max );
   void Process(void);
+  void computeBoundBoxesAndTableMapsForDisplay(void);
 
 protected:
   void createMenus();

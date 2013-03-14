@@ -251,7 +251,12 @@ void MontageView::loadProject()
       Table = NULL;
     return;
   }
+  this->computeBoundBoxesAndTableMapsForDisplay();
+  return;
+}
 
+void MontageView::computeBoundBoxesAndTableMapsForDisplay()
+{
   std::cout<<"Computing label stats for the label image\n";
 
   LabelStatisticsImageFilterType::Pointer LabelStats = LabelStatisticsImageFilterType::New();
@@ -705,6 +710,7 @@ void MontageView::Process()
 
   LabelImage = pProc->GetOutputImage();
   Table = pProc->GetTable();
+  this->computeBoundBoxesAndTableMapsForDisplay();
 }
 
 itk::SizeValueType MontageView::InsertNewLabelToRelabelMap( itk::SizeValueType NewKey )
