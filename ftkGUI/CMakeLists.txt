@@ -56,14 +56,14 @@ SET( NONQT_GUI_HDRS
 	MontageRegionSelection.h
 )
 
+SET( GUI_LIBS
+  ${QT_LIBRARIES} QVTK ftkCommon ftkPreprocess ftkImage TinyXML libSVM
+  ${ITK_LIBRARIES} ${VTK_LIBRARIES} )
+
 IF( BUILD_PROJPROC_WITH_MONT_SEG )
   LIST( APPEND GUI_SRCS MontageView.cpp MontageDiplayArea.cpp )
   LIST( APPEND GUI_HDRS MontageView.h   MontageDiplayArea.h )
 ENDIF()
-
-SET( GUI_LIBS
-  ${QT_LIBRARIES} QVTK ftkCommon ftkPreprocess ftkImage TinyXML libSVM
-  ${ITK_LIBRARIES} ${VTK_LIBRARIES} )
 
 IF(QtTestingFound)
   CONFIGURE_FILE(

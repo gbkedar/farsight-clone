@@ -39,6 +39,12 @@ limitations under the License.
 #include <sstream>
 #include <iomanip>
 
+#ifdef PROJPROC_WITH_MONT_SEG
+#include <boost/filesystem/path.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/lexical_cast.hpp>
+#endif
+
 namespace ftk
 {
 
@@ -80,6 +86,13 @@ double GetStd(std::vector<double> data);
 
 typedef struct { std::string regionChannelName; std::string targetChannelName; int mode;
 				 std::string outputFilename; int radius; int erodeRadius; } PixelAnalysisDefinitions;
+
+#ifdef PROJPROC_WITH_MONT_SEG
+std::string CheckAndCompleteFilename( std::string path, std::string filename );
+bool FindFile( const boost::filesystem::path & dirPath,     // in this directory,
+		const std::vector< std::string > & fileNameParts, // search for these strings,
+		std::string &pathFound );        // placing path here if found
+#endif
 
 }  // end namespace ftk
 

@@ -428,6 +428,139 @@ vtkSmartPointer<vtkTable> AppendTables(vtkSmartPointer<vtkTable> table_initial,v
 
 
 
+#ifdef PROJPROC_WITH_MONT_SEG
+ftk::Image::Pointer LoadXMLImage(std::string filename)
+{
+  TiXmlDocument doc;
+    if ( !doc.LoadFile( filename.c_str() ) )
+      return NULL;
+
+  std::string MyPath = GetFilePath(filename);
+
+  TiXmlElement* rootElement = doc.FirstChildElement();
+  const char* docname = rootElement->Value();
+  if ( strcmp( docname, "Image" ) != 0 )
+    return NULL;
+
+  std::vector<std::string> files;
+  std::vector<std::string> chName;
+  std::vector<unsigned char> color;
+
+  //!Parents we know of: datafilename,resultfilename,object,parameter
+  TiXmlElement* parentElement = rootElement->FirstChildElement();
+  while (parentElement)
+  {
+    const char * parent = parentElement->Value();
+    if ( strcmp( parent, "file" ) == 0 )
+    {
+      std::string currentFilename = parentElement->GetText();
+      std::string::size_type found1 = currentFilename.find_first_of("*");
+      std::string::size_type found2 = currentFilename.find_first_of(".");
+      if( found1!=std::string::npos || found2==0 )
+        currentFilename = CheckAndCompleteFilename( MyPath, currentFilename );
+      files.push_back( currentFilename );
+      chName.push_back( parentElement->Attribute("chname") );
+      color.push_back( atoi(parentElement->Attribute("r")) );
+      color.push_back( atoi(parentElement->Attribute("g")) );
+      color.push_back( atoi(parentElement->Attribute("b")) );
+    }
+    parentElement = parentElement->NextSiblingElement();
+  } // end while(parentElement)
+  //doc.close();
+
+  ftk::Image::Pointer img = ftk::Image::New();
+  if(!img->LoadFilesAsMultipleChannels(files,chName,color))	//Load for display
+  {
+    img = NULL;
+  }
+  return img;
+}
+
+std::string CheckAndCompleteFilename( std::string path, std::string filename )
+{
+  std::string::size_type found1 = filename.find_first_of("*");
+  std::string::size_type found2 = filename.find_first_of(".");
+  if( found2==0 && found1==std::string::npos )
+  {
+    std::string returnString = path + filename.substr(1);
+    return returnString;
+  }
+  if( found2!=0 )
+    path = GetFilePath( filename );
+  filename = GetFilenameFromFullPath( filename );
+  //Breakfilename into parts
+  std::vector<std::string> filenameParts;
+  found2 = filename.find_first_of("*");
+  if(found2==0)
+  {
+    found1 = 1;
+    found2 = filename.find_first_of("*",1);
+  }
+  else
+    found1 = 0;
+  while( found2!=std::string::npos )
+  {
+    filenameParts.push_back( filename.substr( found1, found2-found1 ) );
+    found1 = found2+1;
+    found2 = filename.find_first_of("*",found2+1);
+  }
+  if( found1 < filename.size() )
+  {
+    filenameParts.push_back( filename.substr( found1, filename.size()-1 ) );
+  }
+  boost::filesystem::path searchPath = path.c_str();
+  bool found = FindFile( searchPath, filenameParts, filename );
+  if( !found )
+  {
+    std::cout<<"Error: Filename with following parts not found. Reader will fail!\n";
+    for( std::vector< std::string >::const_iterator iter = filenameParts.begin();
+	 iter!=filenameParts.end(); ++iter )
+	 std::cout<<"\t"<<*iter;
+    std::cout<<std::endl;
+  }
+  else
+  {
+    std::string returnString = filename;
+    std::cout<<"FILENAME:"<<returnString<<std::endl;
+    exit (EXIT_FAILURE);
+    return returnString;
+  }
+  return NULL;
+}
+
+bool FindFile( const boost::filesystem::path & dirPath,     // in this directory,
+		const std::vector< std::string > & fileNameParts, // search for these strings,
+		std::string &pathFound )        // placing path here if found
+{
+  if ( !boost::filesystem::exists( dirPath ) ) return false;
+  boost::filesystem::directory_iterator end_itr; // default construction yields past-the-end
+  bool found;
+  for( boost::filesystem::directory_iterator itr( dirPath ); itr != end_itr; ++itr )
+  {
+    if ( !boost::filesystem::is_directory( *itr ) )
+    {
+      std::string currentFile = itr->path().string();
+      std::vector< std::string >::const_iterator iter = fileNameParts.begin();
+      while( iter!=fileNameParts.end() )
+      {
+	std::string::size_type found = currentFile.find( *iter );
+	if( found !=std::string::npos )
+	  ++iter;
+	else
+	  break;
+      }
+      if( iter==fileNameParts.end() )
+      {
+	pathFound = currentFile;
+	std::cout<<"PathFound:"<<pathFound<<std::endl;
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+#else
 ftk::Image::Pointer LoadXMLImage(std::string filename)
 {
 	/*!
@@ -470,7 +603,7 @@ ftk::Image::Pointer LoadXMLImage(std::string filename)
 	}
 	return img;
 }
-
+#endif
 ftk::Image::Pointer LoadImageSeries(std::string filename)
 {
 	/*!

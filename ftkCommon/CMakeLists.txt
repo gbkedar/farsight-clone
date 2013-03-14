@@ -48,10 +48,8 @@ else (BUILD_CUDA)
 	)
 endif (BUILD_CUDA)
 
-
 TARGET_LINK_LIBRARIES( ftkCommon TinyXML ftkImage QHULL
-                       ${VTK_LIBRARIES}
-                       ${ITK_LIBRARIES} )
+                       ${VTK_LIBRARIES} ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
 
 ADD_EXECUTABLE( block main.cpp )
 TARGET_LINK_LIBRARIES( block ftkCommon )
