@@ -521,8 +521,6 @@ std::string CheckAndCompleteFilename( std::string path, std::string filename )
   else
   {
     std::string returnString = filename;
-    std::cout<<"FILENAME:"<<returnString<<std::endl;
-    exit (EXIT_FAILURE);
     return returnString;
   }
   return NULL;
@@ -552,7 +550,6 @@ bool FindFile( const boost::filesystem::path & dirPath,     // in this directory
       if( iter==fileNameParts.end() )
       {
 	pathFound = currentFile;
-	std::cout<<"PathFound:"<<pathFound<<std::endl;
         return true;
       }
     }
