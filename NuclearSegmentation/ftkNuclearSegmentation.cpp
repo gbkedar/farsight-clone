@@ -108,9 +108,9 @@ bool NuclearSegmentation::SetInput(ftk::Image::Pointer inImg, std::string fname,
 		errorMessage = "channel does not exist";
 		return false;
 	}
-	if(inImg->GetImageInfo()->dataType != itk::ImageIOBase::UCHAR)
+	if(inImg->GetImageInfo()->dataType != itk::ImageIOBase::USHORT)
 	{
-		errorMessage = "module only works for 8-bit unsigned char input data";
+		errorMessage = "module only works for 8-bit unsigned short input data";
 		return false;
 	}
 	this->dataFilename = fname;
@@ -219,7 +219,7 @@ bool NuclearSegmentation::Binarize(bool getResultImg)
 	int numRows = info->numRows;				//y-direction
 	int numColumns = info->numColumns; 			//x-direction
 
-	unsigned char *dptr = dataImage->GetSlicePtr<unsigned char>(0,channelNumber,0);	//Expects grayscale image // Amin: should include a for loop
+	unsigned short *dptr = dataImage->GetSlicePtr<unsigned short>(0,channelNumber,0);	//Expects grayscale image // Amin: should include a for loop
 
 	if(NucleusSeg) delete NucleusSeg;
 	NucleusSeg = new yousef_nucleus_seg();
@@ -240,7 +240,11 @@ bool NuclearSegmentation::Binarize(bool getResultImg)
 	NucleusSeg->setDataImage( dptr, numColumns, numRows, numStacks, dataFilename.c_str() );
 	if(adap_bin == 1)
 	{
-		itk::Image<unsigned char, 3>::Pointer binImage = Adaptive_Binarization(dataImage->GetItkPtr<unsigned char>(0,channelNumber));
+		itk::Image<unsigned char, 3>::Pointer binImage;
+		if( numStacks>1 )
+			binImage = Adaptive_Binarization(dataImage->GetItkPtr<unsigned short>(0,channelNumber));
+		else
+			binImage = AdaptiveBinarization2D(dataImage->GetItkPtr<unsigned short>(0,channelNumber));
 		itk::Image<unsigned char, 3>::PixelType *binArray = binImage->GetBufferPointer();
 		unsigned long long imgArrayLength = numStacks*numRows*numColumns;
 		unsigned short *binPtr = new unsigned short[imgArrayLength];
@@ -340,7 +344,7 @@ bool NuclearSegmentation::SegmentAllTimes(bool finalize)
 	// Run the segmentation
 	for (int t = 0; t<numTSlices; ++t)
 	{
-		unsigned char *dptr = dataImage->GetSlicePtr<unsigned char>(t,channelNumber,0);	//Expects grayscale image 
+		unsigned short *dptr = dataImage->GetSlicePtr<unsigned short>(t,channelNumber,0);	//Expects grayscale image 
 		NucleusSeg->setDataImage( dptr, numColumns, numRows, numStacks, dataFilename.c_str() );
 		NucleusSeg->runBinarization();
 		NucleusSeg->runSeedDetection();
@@ -915,8 +919,8 @@ bool NuclearSegmentation::LoadFromDAT(std::string fname)
 	int numRows = info->numRows;				//y-direction
 	int numColumns = info->numColumns; 			//x-direction
 
-	//We assume that the image is unsigned char, but just in case it isn't we make it so:
-	unsigned char *dptr = dataImage->GetSlicePtr<unsigned char>(0,channelNumber,0);		//Expects grayscale image	
+	//We assume that the image is unsigned short, but just in case it isn't we make it so:
+	unsigned short *dptr = dataImage->GetSlicePtr<unsigned short>(0,channelNumber,0);		//Expects grayscale image	
 	NucleusSeg->setDataImage( dptr, numColumns, numRows, numStacks, dataFilename.c_str() );
 	NucleusSeg->readFromIDLFormat(fname);
 	this->lastRunStep = 4;
@@ -1479,13 +1483,13 @@ std::vector< std::vector<int> > NuclearSegmentation::BatchSplit(std::vector<int>
 	sz[2] = dataImage->GetImageInfo()->numZSlices;
 	
 
-	typedef ftk::LabelImageToFeatures< unsigned char, unsigned short, 3 > FeatureCalcType;
+	typedef ftk::LabelImageToFeatures< unsigned short, unsigned short, 3 > FeatureCalcType;
 	FeatureCalcType::Pointer labFilter = FeatureCalcType::New();
-	labFilter->SetImageInputs( dataImage->GetItkPtr<unsigned char>(0,0), labelImage->GetItkPtr<unsigned short>(0,0) );
+	labFilter->SetImageInputs( dataImage->GetItkPtr<unsigned short>(0,0), labelImage->GetItkPtr<unsigned short>(0,0) );
 	labFilter->SetLevel( 1 );
 	labFilter->Update();
 
-	unsigned char * dataArray = dataImage->GetItkPtr<unsigned char>(0,0)->GetBufferPointer();
+	unsigned short * dataArray = dataImage->GetItkPtr<unsigned short>(0,0)->GetBufferPointer();
 	unsigned short * labelArray = labelImage->GetItkPtr<unsigned short>(0,0)->GetBufferPointer();
 
 	std::vector< std::vector<int> > groups;
@@ -1547,7 +1551,7 @@ std::vector< std::vector<int> > NuclearSegmentation::BatchSplit(std::vector<int>
 			}
 		}
 
-		typedef itk::Image<unsigned char, 3> UCharImageType;
+		typedef itk::Image<unsigned short, 3> UCharImageType;
 		typedef itk::Image<unsigned short, 3> UShortImageType;
 
 		UCharImageType::Pointer rawImage = UCharImageType::New();
@@ -1587,7 +1591,7 @@ std::vector< std::vector<int> > NuclearSegmentation::BatchSplit(std::vector<int>
 		}
 
 
-		itk::ImageFileWriter< itk::Image < unsigned char, 3 > >::Pointer writer1 = itk::ImageFileWriter< itk::Image< unsigned char, 3 > >::New();
+		itk::ImageFileWriter< itk::Image < unsigned short, 3 > >::Pointer writer1 = itk::ImageFileWriter< itk::Image< unsigned short, 3 > >::New();
 		writer1->SetInput(rawImage);
 		writer1->SetFileName("C:\\raw_window_1.tif");
 		writer1->Update();
@@ -2046,7 +2050,7 @@ int NuclearSegmentation::AddObject(int x1, int y1, int z1, int x2, int y2, int z
 	if(sz_x<1 || sz_y<1 || sz_z<1)
 		return 0;
 
-	unsigned char *dptr = dataImage->GetSlicePtr<unsigned char>(0,channelNumber,0);		//Expects grayscale image
+	unsigned short *dptr = dataImage->GetSlicePtr<unsigned short>(0,channelNumber,0);		//Expects grayscale image
 	unsigned short *lptr = labelImage->GetSlicePtr<unsigned short>(0,0,0);				//Expects grayscale image
 
 	ReleaseSegMemory();	//If I'm in add mode must be done with segmentation!!!
@@ -2389,16 +2393,16 @@ bool NuclearSegmentation::addObjectsToMaps(std::set<unsigned short> IDs, int x1,
 	ftk::Image::PtrMode mode;
 	mode = static_cast<ftk::Image::PtrMode>(2); //use DEEP_COPY mode
 
-	itk::Image<unsigned char, 3>::Pointer dataImageItk = dataImage->GetItkPtr<unsigned char>(currentTime,0, mode);
+	itk::Image<unsigned short, 3>::Pointer dataImageItk = dataImage->GetItkPtr<unsigned short>(currentTime,0, mode);
 	itk::Image<unsigned short, 3>::Pointer labelImageItk = labelImage->GetItkPtr<unsigned short>(currentTime,0, mode);
 
-	//chImg->CreateData3DFromItkPtr<unsigned char>(dataImageItk);
+	//chImg->CreateData3DFromItkPtr<unsigned short>(dataImageItk);
 	//lbImg->CreateData3DFromItkPtr<unsigned short>(labelImageItk);
 
 	ftk::Image::DataType dataType = dataImage->GetImageInfo()->dataType;
 	ftk::Image::DataType labelType = labelImage->GetImageInfo()->dataType;
-	unsigned char databpPix = dataImage->GetImageInfo()->bytesPerPix;
-	unsigned char labelbpPix = labelImage->GetImageInfo()->bytesPerPix;
+	unsigned short databpPix = dataImage->GetImageInfo()->bytesPerPix;
+	unsigned short labelbpPix = labelImage->GetImageInfo()->bytesPerPix;
 	unsigned short cs = dataImage->GetImageInfo()->numColumns;
 	unsigned short rs = dataImage->GetImageInfo()->numRows;
 	unsigned short zs = dataImage->GetImageInfo()->numZSlices;

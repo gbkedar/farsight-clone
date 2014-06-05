@@ -37,7 +37,8 @@ IntrinsicFeatureCalculator::IntrinsicFeatureCalculator()
 bool IntrinsicFeatureCalculator::SetInputImages(ftk::Image::Pointer intImg, ftk::Image::Pointer labImg, int intChannel, int labChannel, bool CytoImage)
 {
 	cyto_image = CytoImage;
-	if(intImg->GetImageInfo()->dataType != itk::ImageIOBase::UCHAR)
+	if( (intImg->GetImageInfo()->dataType != itk::ImageIOBase::UCHAR) &&
+	    (intImg->GetImageInfo()->dataType != itk::ImageIOBase::USHORT) )
 		return false;
 	if(labImg->GetImageInfo()->dataType != itk::ImageIOBase::USHORT)
 		return false;
@@ -145,122 +146,19 @@ int IntrinsicFeatureCalculator::needLevel(void)
 //Compute features turned ON in doFeat and puts them in a new table
 vtkSmartPointer<vtkTable> IntrinsicFeatureCalculator::Compute(void)
 {
-	vtkSmartPointer<vtkTable> table = vtkSmartPointer<vtkTable>::New();
-
+	vtkSmartPointer<vtkTable> table;
 	if(!intensityImage || !labelImage)
 	{
+		table = vtkSmartPointer<vtkTable>::New();
 		return table;
 	}
-
-	//Compute features:
-	typedef ftk::LabelImageToFeatures< IPixelT, LPixelT, 3 > FeatureCalcType;
-	FeatureCalcType::Pointer labFilter = FeatureCalcType::New();
-	if(useRegion)
+	if(intensityImage->GetImageInfo()->dataType == itk::ImageIOBase::UCHAR )
 	{
-		labFilter->SetImageInputs( intensityImage->GetItkPtr<IPixelT>(0,intensityChannel), labelImage->GetItkPtr<LPixelT>(0,labelChannel), regionIndex, regionSize );
+		table = ComputeTemplate<unsigned char, LPixelT>();
 	}
-	else
+	if(intensityImage->GetImageInfo()->dataType == itk::ImageIOBase::USHORT )
 	{
-		labFilter->SetImageInputs( intensityImage->GetItkPtr<IPixelT>(0,intensityChannel), labelImage->GetItkPtr<LPixelT>(0,labelChannel) );
-	}
-	//labFilter->SetLevel( needLevel() );
-	labFilter->SetLevel( 3); //////////////////////////modified by Yanbin from 3 to 2;
-	labFilter->ComputeSurfaceOn();
-	if( needHistogram() )
-		labFilter->ComputeHistogramOn();
-	if( needTextures() )
-		labFilter->ComputeTexturesOn();
-	labFilter->Update();
-
-	//Init the table (headers):
-	vtkSmartPointer<vtkDoubleArray> column = vtkSmartPointer<vtkDoubleArray>::New();
-	column->SetName( "ID" );
-	table->AddColumn(column);
-	
-	column = vtkSmartPointer<vtkDoubleArray>::New();
-	column->SetName( "centroid_x" );
-	table->AddColumn(column);
-
-	column = vtkSmartPointer<vtkDoubleArray>::New();
-	column->SetName( "centroid_y" );
-	table->AddColumn(column);
-
-	column = vtkSmartPointer<vtkDoubleArray>::New();
-	column->SetName( "centroid_z" );
-	table->AddColumn(column);
-
-//	column = vtkSmartPointer<vtkDoubleArray>::New();
-//	column->SetName( "num_z_slices" );
-//	table->AddColumn(column);
-//
-	for (int i=0; i < IntrinsicFeatures::N; ++i)
-	{
-		if(doFeat[i])
-		{
-			column = vtkSmartPointer<vtkDoubleArray>::New();
-			column->SetName( (fPrefix+IntrinsicFeatures::Info[i].name).c_str() );
-			table->AddColumn(column);
-		}
-	}
-
-	std::vector< FeatureCalcType::LabelPixelType > labels = labFilter->GetLabels();
-
-	for (int i=0; i<(int)labels.size(); ++i)
-	{
-		FeatureCalcType::LabelPixelType id = labels.at(i);
-		if(id == 0) continue;
-		if(useIDs)
-			if(IDs.find(id) == IDs.end()) continue;	//Don't care about this id, so skip it
-		std::vector< std::vector<double> > testVec = labFilter->GetZernikeMoments(id);
-		for(int i=0; i<(int)testVec.size(); ++i)
-		{
-			std::stringstream ss1;
-			ss1 << i;
-			for(int j=0; j<(int)testVec.at(i).size(); ++j)
-			{
-				column = vtkSmartPointer<vtkDoubleArray>::New();
-				std::stringstream ss2;
-				ss2 << ((i%2)+(2*j));
-				column->SetName( ("Zern_"+ss1.str()+"_"+ss2.str()).c_str() );
-				table->AddColumn(column);
-				std::cout<<"computing zernike"<<std::endl;
-			}
-		}
-	}
-
-	//Now populate the table:
-	//std::vector< FeatureCalcType::LabelPixelType > labels = labFilter->GetLabels();
-	for (int i=0; i<(int)labels.size(); ++i)
-	{
-		FeatureCalcType::LabelPixelType id = labels.at(i);
-		if(id == 0) continue;
-		if(useIDs)
-			if(IDs.find(id) == IDs.end()) continue;	//Don't care about this id, so skip it
-
-		ftk::IntrinsicFeatures * features = labFilter->GetFeatures(id);
-		vtkSmartPointer<vtkVariantArray> row = vtkSmartPointer<vtkVariantArray>::New();
-		row->InsertNextValue( vtkVariant(id) );
-		row->InsertNextValue( vtkVariant((int)features->Centroid[0]) );
-		row->InsertNextValue( vtkVariant((int)features->Centroid[1]) );
-		if( intensityImage->GetImageInfo()->numZSlices > 2 )
-			row->InsertNextValue( vtkVariant((int)features->Centroid[2]) );
-		else
-			row->InsertNextValue( vtkVariant(0));
-//		row->InsertNextValue( vtkVariant((int)intensityImage->GetImageInfo()->numZSlices) );
-		for (int i=0; i<IntrinsicFeatures::N; ++i)
-		{
-			if(doFeat[i])
-				row->InsertNextValue( vtkVariant(features->ScalarFeatures[i]) );
-		}
-		std::vector< std::vector<double> > zernVec = labFilter->GetZernikeMoments(id);
-		for(int i=0; i<(int)zernVec.size(); ++i)
-		{
-			for(int j=0; j<(int)zernVec.at(i).size(); ++j)
-			{
-				row->InsertNextValue( vtkVariant(zernVec.at(i).at(j)) );
-			}
-		}
-		table->InsertNextRow(row);
+		table = ComputeTemplate<unsigned short, LPixelT>();
 	}
 	return table;
 }

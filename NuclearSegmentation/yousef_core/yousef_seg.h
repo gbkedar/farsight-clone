@@ -87,10 +87,10 @@ public:
 	//: destructor
 	~yousef_nucleus_seg();
 
-	void setDataImage(unsigned char* imgPtr, int x, int y, int z, const char* filename);	//The image is loaded elsewhere and passed here.  I do not delete the data.
+	void setDataImage(unsigned short* imgPtr, int x, int y, int z, const char* filename);	//The image is loaded elsewhere and passed here.  I do not delete the data.
 	void setParams(int *params);		//All parameters passed as integers, set the parameters accordingly
   	void setParamsForSeedDetection(int highsensitivity, double sMin, double sMax, double rXY,  double rZ, int usedistMap, int samplingRatio, int minSize = 50);
-	unsigned char* getDataImagePtr(){ return dataImagePtr; };								
+	unsigned short* getDataImagePtr(){ return dataImagePtr; };								
 	unsigned short* getBinImage(){ return binImagePtr; }; 
 	void setBinImage(unsigned short* ptr); 
 	unsigned short* getSeedImage(){ return seedImagePtr; };
@@ -146,9 +146,9 @@ public:
 	bool DeleteInit(ftk::Object::Point P1);
 	int getMaxID(int);
 	//added by Yousef on 9/11/2009
-	int AddObject(unsigned char* inImage, unsigned short* lbImage, std::vector<int> P1, std::vector<int> P2, std::vector<itk::SizeValueType> imSZ, int maxID);
+	int AddObject(unsigned short* inImage, unsigned short* lbImage, std::vector<int> P1, std::vector<int> P2, std::vector<itk::SizeValueType> imSZ, int maxID);
 	//added by Yousef on 9/26/2009
-	int AddObject2D(unsigned char* inImage, unsigned short* lbImage, std::vector<int> P1, std::vector<int> P2, std::vector<itk::SizeValueType> imSZ, int maxID);
+	int AddObject2D(unsigned short* inImage, unsigned short* lbImage, std::vector<int> P1, std::vector<int> P2, std::vector<itk::SizeValueType> imSZ, int maxID);
 	
 
 private:	
@@ -170,7 +170,7 @@ private:
 	void fitMixGaussians();	
 
 	//Internal Image information
-	unsigned char* dataImagePtr;	//Created outside yousef_seg
+	unsigned short* dataImagePtr;	//Created outside yousef_seg
 	std::string dataFilename;
 	unsigned short* binImagePtr;				//Created in yousef_seg
 	unsigned short* seedImagePtr;				//Created in yousef_seg

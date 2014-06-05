@@ -325,8 +325,8 @@ bool ProjectProcessor::SegmentNuclei(int nucChannel)
 void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
 {
   std::cout<<"Using Montage Segmentation\n";
-  typedef itk::ConnectedComponentImageFilter< InputImageType1, LabelImageType1 > ConnectedComponentFilterType;
-  typedef itk::ImageRegionIteratorWithIndex< InputImageType1 > BinMontageIteratorType;
+  typedef itk::ConnectedComponentImageFilter< InputImTypeUShort3, LabelImageType1 > ConnectedComponentFilterType;
+  typedef itk::ImageRegionIteratorWithIndex< InputImTypeUShort3 > BinMontageIteratorType;
 
   std::string TempFolder = CheckWritePermissionsNCreateTempFolder();
 
@@ -338,7 +338,7 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
      if(definition->nuclearParameters.at(i).name == "max_scale")
         MaxScale = ((double)definition->nuclearParameters.at(i).value * 10);
 
-  std::cout<<"Using max scale "<<MaxScale<<std::endl;
+  std::cout<<"Using max padding scale for each tile:"<<MaxScale<<std::endl;
 
   const Image::Info *info = inputImage->GetImageInfo();
   itk::SizeValueType numStacks = info->numZSlices;  //z-direction
@@ -347,7 +347,7 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
   itk::SizeValueType numTSlices = info->numTSlices; //t-direction
 
   itk::SizeValueType TimePointSize = numStacks*numRows*numColumns;
-  InputImageType1::Pointer InputImage = inputImage->GetItkPtr<unsigned char>
+  InputImTypeUShort3::Pointer InputImage = inputImage->GetItkPtr<unsigned short>
 							(0,nucChannel,ftk::Image::DEFAULT);
 
   //Compute tile-size for binarization keep 400 to be the min in any dimension
@@ -371,14 +371,27 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
   //Step 1: Binarize the images
 { //Scoping for binary image
   //Start by allocating memory for the binary image
-  InputImageType1::Pointer BinaryImage = InputImageType1::New();
-  InputImageType1::IndexType BinStart;
+
+#if 0 //Code to read binary from disk
+  typedef itk::ImageFileReader< InputImTypeUShort3 > ReaderType;
+  ReaderType::Pointer reader = ReaderType::New();
+  reader->SetFileName( "bin_out.tif" );
+  try{ reader->Update(); }
+  catch( itk::ExceptionObject & excp )
+  {
+    std::cerr << excp << std::endl;
+  }
+  InputImTypeUShort3::Pointer BinaryImage = reader->GetOutput();*/
+#endif
+
+  InputImTypeUShort3::Pointer BinaryImage = InputImTypeUShort3::New();
+  InputImTypeUShort3::IndexType BinStart;
   BinStart[0] = BinStart[1] = BinStart[2]  = 0;
-  InputImageType1::SizeType BinSize;
+  InputImTypeUShort3::SizeType BinSize;
   BinSize[0] = numColumns;
   BinSize[1] = numRows;
   BinSize[2] = numStacks;
-  InputImageType1::RegionType BinRegion;
+  InputImTypeUShort3::RegionType BinRegion;
   BinRegion.SetSize ( BinSize );
   BinRegion.SetIndex( BinStart );
   BinaryImage->SetRegions( BinRegion );
@@ -409,27 +422,26 @@ void  ProjectProcessor::SegmentNucleiMontage( int nucChannel )
     {
 	std::cout<<"Binarizing tile "<< (i*NumHorizontalTiles+j) <<" of "
 		 <<(NumVerticalTiles*NumHorizontalTiles)<<"\n";
-	InputImageType1::IndexType Start;
+	InputImTypeUShort3::IndexType Start;
 	//Ensure that the last tile is big enough
 	Start[0] = (j*(TileSize-MaxScale)) < (numColumns-TileSize) ?
 		   (j*(TileSize-MaxScale)) : (numColumns-TileSize-1);
 	Start[1] = (i*(TileSize-MaxScale)) < (numRows   -TileSize) ?
 		   (i*(TileSize-MaxScale)) : (numRows   -TileSize-1);
 	Start[2] = 0;
-	InputImageType1::SizeType Size;
+	InputImTypeUShort3::SizeType Size;
 	Size[0] = TileSize;
 	Size[1] = TileSize;
 	Size[2] = numStacks;
 	BinarizeTile( InputImage, BinaryImage, Start, Size, TempFolder );
     }
 
-  typedef itk::ImageFileWriter< InputImageType1 > BinaryWriterType;
+  typedef itk::ImageFileWriter< InputImTypeUShort3 > BinaryWriterType;
   BinaryWriterType::Pointer binwriter = BinaryWriterType::New();
   binwriter->SetInput( BinaryImage );
   binwriter->SetFileName( binWriterStr.c_str() );
   try{ binwriter->Update(); }
   catch( itk::ExceptionObject & excp ){ std::cerr << excp << std::endl; }
-
   //Compute CCs and save them
 #ifdef _OPENMP
   itk::MultiThreader::SetGlobalDefaultNumberOfThreads(n_thr);
@@ -499,26 +511,26 @@ std::string ProjectProcessor::CheckWritePermissionsNCreateTempFolder()
   }
   return temp_dir_str;
 }
-void ProjectProcessor::BinarizeTile( InputImageType1::Pointer InputImage,
-  InputImageType1::Pointer BinaryImage, InputImageType1::IndexType Start, InputImageType1::SizeType Size,
+void ProjectProcessor::BinarizeTile( InputImTypeUShort3::Pointer InputImage,
+  InputImTypeUShort3::Pointer BinaryImage, InputImTypeUShort3::IndexType Start, InputImTypeUShort3::SizeType Size,
   std::string TempFolder )
 {
-  typedef itk::RegionOfInterestImageFilter< InputImageType1, InputImageType1 > ROIFilterType;
+  typedef itk::RegionOfInterestImageFilter< InputImTypeUShort3, InputImTypeUShort3 > ROIFilterType;
   typedef itk::Image< unsigned short,  3 >  BinaryImageType;
   typedef itk::ConnectedComponentImageFilter< BinaryImageType, BinaryImageType >
   								ConnectedComponentFilterType;
   typedef itk::ImageRegionConstIterator< BinaryImageType > BinOutConstIteratorType;
-  typedef itk::ImageRegionIteratorWithIndex< InputImageType1 > BinMontageIteratorType;
+  typedef itk::ImageRegionIteratorWithIndex< InputImTypeUShort3 > BinMontageIteratorType;
 
   //Redefine some constants
   itk::SizeValueType numStacks = Size[2];
   itk::SizeValueType TileSize = Size[0];
 
   //Crop Input Image
-  unsigned char *DataPtr;
-  DataPtr = (unsigned char*)malloc( sizeof(unsigned char)*TileSize*TileSize*numStacks );
+  unsigned short *DataPtr;
+  DataPtr = (unsigned short*)malloc( sizeof(unsigned short)*TileSize*TileSize*numStacks );
 { //Scoping for temp cropimage
-    InputImageType1::RegionType CroppedRegion;
+    InputImTypeUShort3::RegionType CroppedRegion;
     CroppedRegion.SetSize ( Size );
     CroppedRegion.SetIndex( Start );
     ROIFilterType::Pointer CropImageFilter = ROIFilterType::New();
@@ -529,8 +541,8 @@ void ProjectProcessor::BinarizeTile( InputImageType1::Pointer InputImage,
     {
       std::cerr <<  "Extraction for binarization failed" << excp << std::endl;
     }
-#if 0
-  typedef itk::ImageFileWriter< InputImageType1 > BinaryWriterType1;
+#if 1
+  typedef itk::ImageFileWriter< InputImTypeUShort3 > BinaryWriterType1;
   BinaryWriterType1::Pointer binwriter1 = BinaryWriterType1::New();
   binwriter1->SetInput( CropImageFilter->GetOutput() );
   std::stringstream filess1;
@@ -563,7 +575,7 @@ void ProjectProcessor::BinarizeTile( InputImageType1::Pointer InputImage,
   std::vector<unsigned char> color;
   color.assign(3,255);
   FTKIImage->AppendChannelFromData3D( (void*)DataPtr,
-					itk::ImageIOBase::UCHAR, sizeof(unsigned char),
+					itk::ImageIOBase::USHORT, sizeof(unsigned short),
 					Size[0], Size[1], Size[2], "nuc", color, false );
   newNucSeg->SetInput( FTKIImage, "nuc", 0 );
 
@@ -603,7 +615,7 @@ void ProjectProcessor::BinarizeTile( InputImageType1::Pointer InputImage,
 	  FtkBinIndex[0] = m-Start[0];
 	  FtkBinIndex[1] = l-Start[1];
 	  FtkBinIndex[2] = k;
-	  InputImageType1::IndexType BinaryImIndex;
+	  InputImTypeUShort3::IndexType BinaryImIndex;
 	  BinaryImIndex[0] = m;
 	  BinaryImIndex[1] = l;
 	  BinaryImIndex[2] = k;
@@ -613,7 +625,7 @@ void ProjectProcessor::BinarizeTile( InputImageType1::Pointer InputImage,
 	    BinMontagIter.Set( 255 );
         }
   }
-#if 0
+#if 1
   typedef itk::ImageFileWriter< BinaryImageType > BinaryWriterType;
   BinaryWriterType::Pointer binwriter = BinaryWriterType::New();
   binwriter->SetInput( BinIm );
@@ -628,12 +640,12 @@ void ProjectProcessor::BinarizeTile( InputImageType1::Pointer InputImage,
 }
 
 std::vector< ftk::ProjectProcessor::BBoxType > ProjectProcessor::ReSegmentCCs
-		( InputImageType1::Pointer InputImage, LabelImageType1::Pointer CCImage,
+		( InputImTypeUShort3::Pointer InputImage, LabelImageType1::Pointer CCImage,
 		  std::vector< std::string >& SegOutFilenames,
 		  std::vector<LabelImageType1::PixelType>& labelsList, std::string TempFolder,
 		  unsigned MaxScale, itk::SizeValueType& NumberOfCells ) 
 {
-  typedef itk::LabelStatisticsImageFilter< InputImageType1, LabelImageType1 > LabelStatisticsImageFilterType;
+  typedef itk::LabelStatisticsImageFilter< InputImTypeUShort3, LabelImageType1 > LabelStatisticsImageFilterType;
   typedef LabelStatisticsImageFilterType::ValidLabelValuesContainerType ValidLabelValuesType;
   std::vector< BBoxType > OutputBBoxes;
 #ifdef _OPENMP
@@ -708,27 +720,27 @@ void ProjectProcessor::WriteIntermediateLabels( LabelImageType::Pointer &Input, 
   }
 }
 
-std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer InputImage,
+std::string ProjectProcessor::SegmentNucleiInBBox( InputImTypeUShort3::Pointer InputImage,
 			LabelImageType1::Pointer CCImage, BBoxType BBox, unsigned MaxScale,
 			LabelImageType1::PixelType CurrentBBLabel, std::string TempFolder,
 			LabelImageType1::PixelType& NumCells, LabelImageType::Pointer& IntermediateLabel )
 {
 //Start copy pasta  ***From BinarizeTile***
-  typedef itk::RegionOfInterestImageFilter< InputImageType1, InputImageType1 > ROIFilterType;
-  typedef itk::ImageRegionIteratorWithIndex< InputImageType1 > BinMontageIteratorType;
+  typedef itk::RegionOfInterestImageFilter< InputImTypeUShort3, InputImTypeUShort3 > ROIFilterType;
+  typedef itk::ImageRegionIteratorWithIndex< InputImTypeUShort3 > BinMontageIteratorType;
   typedef itk::ImageRegionIteratorWithIndex< LabelImageType > LabelIteratorType;
   typedef itk::ImageRegionConstIterator< LabelImageType1 > CCsConstIteratorType;
   typedef itk::LabelGeometryImageFilter< LabelImageType > LabelGeometryImageFilterType;
 
-  InputImageType1::SizeType ImageSize;
+  InputImTypeUShort3::SizeType ImageSize;
   ImageSize[0] = InputImage->GetLargestPossibleRegion().GetSize()[0];
   ImageSize[1] = InputImage->GetLargestPossibleRegion().GetSize()[1];
   ImageSize[2] = InputImage->GetLargestPossibleRegion().GetSize()[2];
-  InputImageType1::IndexType Start;
+  InputImTypeUShort3::IndexType Start;
   Start[0] = (BBox[0]-MaxScale) > 0 ? (BBox[0]-MaxScale) : 0;
   Start[1] = (BBox[2]-MaxScale) > 0 ? (BBox[2]-MaxScale) : 0;
   Start[2] = (BBox[4]-MaxScale) > 0 ? (BBox[4]-MaxScale) : 0;
-  InputImageType1::SizeType Size;
+  InputImTypeUShort3::SizeType Size;
   Size[0] = (BBox[1]+MaxScale) < ImageSize[0] ? (BBox[1]+2*MaxScale-BBox[0]) : (ImageSize[0]-Start[0]-1);
   Size[1] = (BBox[3]+MaxScale) < ImageSize[1] ? (BBox[3]+2*MaxScale-BBox[2]) : (ImageSize[1]-Start[1]-1);
   Size[2] = (BBox[5]+MaxScale) < ImageSize[2] ? (BBox[5]+2*MaxScale-BBox[4]) : (ImageSize[2]-Start[2]-1);
@@ -736,10 +748,10 @@ std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer Inpu
   if( !Size[1] ) Size[1] = 1;
   if( !Size[2] ) Size[2] = 1;
   //Crop Input Image
-  unsigned char *DataPtr;
-  DataPtr = (unsigned char*)malloc( sizeof(unsigned char)*Size[0]*Size[1]*Size[2] );
+  unsigned short *DataPtr;
+  DataPtr = (unsigned short*)malloc( sizeof(unsigned short)*Size[0]*Size[1]*Size[2] );
 //{ //Scoping for temp cropimage
-    InputImageType1::RegionType CroppedRegion;
+    InputImTypeUShort3::RegionType CroppedRegion;
     CroppedRegion.SetSize ( Size );
     CroppedRegion.SetIndex( Start );
     std::cout<<"Cropping region "<<CroppedRegion<<std::endl<<std::flush;
@@ -774,7 +786,7 @@ std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer Inpu
   std::vector<unsigned char> color;
   color.assign(3,255);
   FTKIImage->AppendChannelFromData3D( (void*)DataPtr,
-					itk::ImageIOBase::UCHAR, sizeof(unsigned char),
+					itk::ImageIOBase::USHORT, sizeof(unsigned short),
 					Size[0], Size[1], Size[2], "nuc", color, true );
   free( DataPtr );
   newNucSeg->SetInput( FTKIImage, "nuc", 0 );
@@ -847,16 +859,21 @@ std::string ProjectProcessor::SegmentNucleiInBBox( InputImageType1::Pointer Inpu
   if( !NumCells )
   {
     std::cout<<"Re-segmentation failed on current crop region"<<CroppedRegion<<std::endl;
-#if 0
-    typedef itk::ImageFileWriter< InputImageType1 > InputWriterType;
+#if 1
+    typedef itk::ImageFileWriter< InputImTypeUShort3 > InputWriterType;
     InputWriterType::Pointer failedSegWriter = InputWriterType::New();
-    std::string FailFile;
+    InputWriterType::Pointer failedSegWriterLabel = InputWriterType::New();
+    std::string FailFile, FailFileLabel;
     FailFile = TempFolder + "/Seg_Failed_file_" + filess.str() + ".tif" ;
+    FailFileLabel = TempFolder + "/Seg_Failed_file_" + filess.str() + "_label.tif" ;
     failedSegWriter->SetFileName( FailFile.c_str() );
+    failedSegWriterLabel->SetFileName( FailFileLabel.c_str() );
     failedSegWriter->SetInput( CropImageFilter->GetOutput() );
+    failedSegWriterLabel->SetInput( IntermediateLabel );
     try
     {
       failedSegWriter->Update();
+      failedSegWriterLabel->Update();
     }
     catch( itk::ExceptionObject & excp )
     {
@@ -902,7 +919,7 @@ void ProjectProcessor::mmSegmentation(int intChannel, int labChannel)
 			MNS->splitflag = 1;
 		}		
 
-		typedef ftk::LabelImageToFeatures< unsigned char,  unsigned short, 3 > FeatureCalcType;
+		typedef ftk::LabelImageToFeatures< unsigned short,  unsigned short, 3 > FeatureCalcType;
 		typedef ftk::IntrinsicFeatures FeaturesType;
 
 		//Calculates all the features and stores the individual 
@@ -993,14 +1010,14 @@ bool ProjectProcessor::ComputeFeatures(int nucChannel)
 #ifdef _OPENMP
 	//Compute features in parallel instantiated for uchar and ushort intensity images
 	//and ushort and uint label images
-	if( inputImage->GetImageInfo()->dataType == itk::ImageIOBase::UCHAR )
+	if( inputImage->GetImageInfo()->dataType == itk::ImageIOBase::USHORT )
 	{
 		if( outputImage->GetImageInfo()->dataType == itk::ImageIOBase::USHORT )
 			ComputeMontageIntrinsicFeatures
-				< unsigned char, unsigned short >( nucChannel );
+				< unsigned short, unsigned short >( nucChannel );
 		else if( outputImage->GetImageInfo()->dataType == itk::ImageIOBase::UINT )
 			ComputeMontageIntrinsicFeatures
-				< unsigned char, unsigned int >( nucChannel );
+				< unsigned short, unsigned int >( nucChannel );
 		else
 		{
 			std::cout<<"Feature computation can only handle ushort "
@@ -1090,7 +1107,7 @@ bool ProjectProcessor::SegmentCytoplasm(int cytChannel, int memChannel)
 	}
 
 	FTKgraph* CellRAG = new FTKgraph();
-	CellAdjTable = CellRAG->AdjacencyGraph_All(inputImage->GetItkPtr<IPixelT>(0,cytChannel), outputImage->GetItkPtr<LPixelT>(0,1), true);
+	//CellAdjTable = CellRAG->AdjacencyGraph_All(inputImage->GetItkPtr<IPixelT>(0,cytChannel), outputImage->GetItkPtr<LPixelT>(0,1), true);
 
 
 	std::cout << "Done: Intrisic features for the whole cell\n";

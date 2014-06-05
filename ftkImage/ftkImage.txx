@@ -619,6 +619,11 @@ template <typename pixelType> ftk::Image::Pointer
       y2>=this->m_Info.numRows    ||
       z2>=this->m_Info.numZSlices )
   {
+    std::cerr << "Cropping: "<<x1<<"\t"<<y1<<"\t"<<z1<<"\t"
+    			<<x2<<"\t"<<y2<<"\t"<<z2<<"\n";
+    std::cerr << "From image of size:"<<this->m_Info.numColumns<<"\t"
+    		<<this->m_Info.numRows<<"\t"<<this->m_Info.numZSlices
+		<<"\n";
     std::cerr << "Cropping indices out of bounds\n";
     return NULL;
   }

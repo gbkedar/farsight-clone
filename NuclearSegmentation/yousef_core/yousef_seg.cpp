@@ -83,7 +83,7 @@ void yousef_nucleus_seg::setParamsForSeedDetection(int highsensitivity, double s
 }
 
 
-void yousef_nucleus_seg::setDataImage( unsigned char *imgPtr,  int x, int y, int z, const char *filename )
+void yousef_nucleus_seg::setDataImage( unsigned short *imgPtr,  int x, int y, int z, const char *filename )
 {
 	numStacks = z;
 	numRows = y;//y();			//y-direction
@@ -129,7 +129,7 @@ void yousef_nucleus_seg::runGradAnisDiffSmoothing()
 	mySeeds.clear();
 
 	std::cout<<"Starting anisotropic diffusion...";
-	int ok = runGrAnisDiff(dataImagePtr, numRows, numColumns, numStacks, 5, .2, 2);
+	int ok = 0;//runGrAnisDiff(dataImagePtr, numRows, numColumns, numStacks, 5, .2, 2);
 	
 	if(ok)
 	{
@@ -328,7 +328,7 @@ void yousef_nucleus_seg::runSeedDetection()
 
 	//need to pass a float pointer with input image in it, so create it here
 	float *imgPtr = new float[numStacks*numRows*numColumns];
-	ucharToFloat(dataImagePtr /*from*/, imgPtr /*to*/, numRows, numColumns, numStacks, 1 /*invert*/);
+	ushortToFloat(dataImagePtr /*from*/, imgPtr /*to*/, numRows, numColumns, numStacks, 1 /*invert*/);
 	//ushortToFloat(binImagePtr /*from*/, imgPtr /*to*/, numRows, numColumns, numStacks, 1 /*invert*/);
 
 	//allocate space for the laplacian of gaussian
@@ -395,7 +395,7 @@ void yousef_nucleus_seg::runSeedDetection(int minScale,int maxScale)
 
 	//need to pass a float pointer with input image in it, so create it here
 	float *imgPtr = new float[numStacks*numRows*numColumns];
-	ucharToFloat(dataImagePtr /*from*/, imgPtr /*to*/, numRows, numColumns, numStacks, 1 /*invert*/);
+	ushortToFloat(dataImagePtr /*from*/, imgPtr /*to*/, numRows, numColumns, numStacks, 1 /*invert*/);
 	//ushortToFloat(binImagePtr /*from*/, imgPtr /*to*/, numRows, numColumns, numStacks, 1 /*invert*/);
 
 	//allocate space for the laplacian of gaussian
@@ -2295,7 +2295,7 @@ int yousef_nucleus_seg::getMaxID(int Int_Fin)
 }
 
 //int yousef_nucleus_seg::AddObject(ftk::Object::Point P1, ftk::Object::Point P2)
-int yousef_nucleus_seg::AddObject(unsigned char* inImage, unsigned short* lbImage, std::vector<int> P1, std::vector<int> P2, std::vector<itk::SizeValueType> imSZ, int maxID)
+int yousef_nucleus_seg::AddObject(unsigned short* inImage, unsigned short* lbImage, std::vector<int> P1, std::vector<int> P2, std::vector<itk::SizeValueType> imSZ, int maxID)
 {		
 	//get the coordinates of the two points and the size of the box
 	int x1 = P1[0];
@@ -2324,7 +2324,7 @@ int yousef_nucleus_seg::AddObject(unsigned char* inImage, unsigned short* lbImag
 	int cent_z = (z2+z1)/2;
 	int max_dist = (int) sqrt((double)(x2-cent_x)*(x2-cent_x)+(y2-cent_y)*(y2-cent_y)+(z2-cent_z)*(z2-cent_z));
 	//extract the region from the raw image	
-	unsigned char* subDataImagePtr = new unsigned char[sz_x*sz_y*sz_z];
+	unsigned short* subDataImagePtr = new unsigned short[sz_x*sz_y*sz_z];
 	int ind =0;	
 	for(int k=z1; k<=z2; k++)
 	{
@@ -2490,7 +2490,7 @@ int yousef_nucleus_seg::AddObject(unsigned char* inImage, unsigned short* lbImag
 }
 
 
-int yousef_nucleus_seg::AddObject2D(unsigned char* inImage, unsigned short* lbImage, std::vector<int> P1, std::vector<int> P2, std::vector<itk::SizeValueType> imSZ, int maxID)
+int yousef_nucleus_seg::AddObject2D(unsigned short* inImage, unsigned short* lbImage, std::vector<int> P1, std::vector<int> P2, std::vector<itk::SizeValueType> imSZ, int maxID)
 {		
 	//get the coordinates of the two points and the size of the box
 	int x1 = P1[0];
@@ -2505,7 +2505,7 @@ int yousef_nucleus_seg::AddObject2D(unsigned char* inImage, unsigned short* lbIm
 	int cent_y = (y2+y1)/2;	
 	int max_dist = (int) sqrt((double)(x2-cent_x)*(x2-cent_x)+(y2-cent_y)*(y2-cent_y));
 	//extract the region from the raw image	
-	unsigned char* subDataImagePtr = new unsigned char[sz_x*sz_y];
+	unsigned short* subDataImagePtr = new unsigned short[sz_x*sz_y];
 	int ind =0;		
 	for(int i=y1; i<=y2; i++)
 	{
@@ -2526,7 +2526,8 @@ int yousef_nucleus_seg::AddObject2D(unsigned char* inImage, unsigned short* lbIm
 	unsigned short* subBinImagePtr = new unsigned short[sz_x*sz_y];
 	memset(subBinImagePtr/*destination*/,0/*value*/,sz_x*sz_y*sizeof(unsigned short)/*num bytes to move*/);
 	
-	int ok = Cell_Binarization_2D(subDataImagePtr,subBinImagePtr, sz_y, sz_x, 0); //Do Binarization		
+	int ok =  Cell_Binarization_3D( subDataImagePtr,subBinImagePtr, sz_y, sz_x, 0, 0, 1, 255);
+	//Cell_Binarization_2D(subDataImagePtr,subBinImagePtr, sz_y, sz_x, 0); //Do Binarization		
 	if(ok==0)
 		return 0;
 	

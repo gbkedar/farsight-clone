@@ -433,14 +433,24 @@ ftk::Image::Pointer LoadXMLImage(std::string filename)
 {
   TiXmlDocument doc;
     if ( !doc.LoadFile( filename.c_str() ) )
+    {
+      std::cout	<<"Tiny xml was not able to read the xml file. Check xml file for"
+		<<" completeness \n";
+      std::cout<<"Filename:"<<filename<<std::endl;
       return NULL;
+    }
 
   std::string MyPath = GetFilePath(filename);
 
   TiXmlElement* rootElement = doc.FirstChildElement();
   const char* docname = rootElement->Value();
   if ( strcmp( docname, "Image" ) != 0 )
+  {
+    std::cout<<"Root element in the input xml file is not Image. Check if you"
+		<<" have seleted the right file.\n";
+    std::cout<<"Filename:"<<filename<<std::endl;
     return NULL;
+  }
 
   std::vector<std::string> files;
   std::vector<std::string> chName;
@@ -471,6 +481,8 @@ ftk::Image::Pointer LoadXMLImage(std::string filename)
   ftk::Image::Pointer img = ftk::Image::New();
   if(!img->LoadFilesAsMultipleChannels(files,chName,color))	//Load for display
   {
+    std::cout<<"Ftk Image returned a null pointer. Check images on disk for"
+		<<" consistency in type etc.\n";
     img = NULL;
   }
   return img;

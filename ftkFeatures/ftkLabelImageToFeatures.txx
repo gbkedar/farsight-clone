@@ -26,6 +26,132 @@ limitations under the License.
 
 #include <math.h>
 
+//Template of ComputeFeatures function to avoid code duplication
+//Allowed input image types are listedd in the SetInputImages() function
+namespace ftk 
+{
+template < typename TInpPixel, typename TLabPixel >vtkSmartPointer<vtkTable> 
+IntrinsicFeatureCalculator::ComputeTemplate(void)
+{
+	vtkSmartPointer<vtkTable> table = vtkSmartPointer<vtkTable>::New();
+
+	if(!intensityImage || !labelImage)
+	{
+		return table;
+	}
+	//Compute features:
+	typedef typename ftk::LabelImageToFeatures< TInpPixel, TLabPixel, 3 > FeatureCalcType;
+	typename FeatureCalcType::Pointer labFilter = FeatureCalcType::New();
+	if(useRegion)
+	{
+		labFilter->SetImageInputs( intensityImage->GetItkPtr<TInpPixel>(0,intensityChannel), labelImage->GetItkPtr<TLabPixel>(0,labelChannel), regionIndex, regionSize );
+	}
+	else
+	{
+		labFilter->SetImageInputs( intensityImage->GetItkPtr<TInpPixel>(0,intensityChannel), labelImage->GetItkPtr<TLabPixel>(0,labelChannel) );
+	}
+	//labFilter->SetLevel( needLevel() );
+	labFilter->SetLevel( 3); //////////////////////////modified by Yanbin from 3 to 2;
+	labFilter->ComputeSurfaceOn();
+	if( needHistogram() )
+		labFilter->ComputeHistogramOn();
+	if( needTextures() )
+		labFilter->ComputeTexturesOn();
+	labFilter->Update();
+
+	//Init the table (headers):
+	vtkSmartPointer<vtkDoubleArray> column = vtkSmartPointer<vtkDoubleArray>::New();
+	column->SetName( "ID" );
+	table->AddColumn(column);
+	
+	column = vtkSmartPointer<vtkDoubleArray>::New();
+	column->SetName( "centroid_x" );
+	table->AddColumn(column);
+
+	column = vtkSmartPointer<vtkDoubleArray>::New();
+	column->SetName( "centroid_y" );
+	table->AddColumn(column);
+
+	column = vtkSmartPointer<vtkDoubleArray>::New();
+	column->SetName( "centroid_z" );
+	table->AddColumn(column);
+
+//	column = vtkSmartPointer<vtkDoubleArray>::New();
+//	column->SetName( "num_z_slices" );
+//	table->AddColumn(column);
+//
+	for (int i=0; i < IntrinsicFeatures::N; ++i)
+	{
+		if(doFeat[i])
+		{
+			column = vtkSmartPointer<vtkDoubleArray>::New();
+			column->SetName( (fPrefix+IntrinsicFeatures::Info[i].name).c_str() );
+			table->AddColumn(column);
+		}
+	}
+
+	std::vector< typename FeatureCalcType::LabelPixelType > labels = labFilter->GetLabels();
+
+	for (int i=0; i<(int)labels.size(); ++i)
+	{
+		typename FeatureCalcType::LabelPixelType id = labels.at(i);
+		if(id == 0) continue;
+		if(useIDs)
+			if(IDs.find(id) == IDs.end()) continue;	//Don't care about this id, so skip it
+		std::vector< std::vector<double> > testVec = labFilter->GetZernikeMoments(id);
+		for(int i=0; i<(int)testVec.size(); ++i)
+		{
+			std::stringstream ss1;
+			ss1 << i;
+			for(int j=0; j<(int)testVec.at(i).size(); ++j)
+			{
+				column = vtkSmartPointer<vtkDoubleArray>::New();
+				std::stringstream ss2;
+				ss2 << ((i%2)+(2*j));
+				column->SetName( ("Zern_"+ss1.str()+"_"+ss2.str()).c_str() );
+				table->AddColumn(column);
+				std::cout<<"computing zernike"<<std::endl;
+			}
+		}
+	}
+
+	//Now populate the table:
+	//std::vector< FeatureCalcType::LabelPixelType > labels = labFilter->GetLabels();
+	for (int i=0; i<(int)labels.size(); ++i)
+	{
+		typename FeatureCalcType::LabelPixelType id = labels.at(i);
+		if(id == 0) continue;
+		if(useIDs)
+			if(IDs.find(id) == IDs.end()) continue;	//Don't care about this id, so skip it
+
+		ftk::IntrinsicFeatures * features = labFilter->GetFeatures(id);
+		vtkSmartPointer<vtkVariantArray> row = vtkSmartPointer<vtkVariantArray>::New();
+		row->InsertNextValue( vtkVariant(id) );
+		row->InsertNextValue( vtkVariant((int)features->Centroid[0]) );
+		row->InsertNextValue( vtkVariant((int)features->Centroid[1]) );
+		if( intensityImage->GetImageInfo()->numZSlices > 2 )
+			row->InsertNextValue( vtkVariant((int)features->Centroid[2]) );
+		else
+			row->InsertNextValue( vtkVariant(0));
+//		row->InsertNextValue( vtkVariant((int)intensityImage->GetImageInfo()->numZSlices) );
+		for (int i=0; i<IntrinsicFeatures::N; ++i)
+		{
+			if(doFeat[i])
+				row->InsertNextValue( vtkVariant(features->ScalarFeatures[i]) );
+		}
+		std::vector< std::vector<double> > zernVec = labFilter->GetZernikeMoments(id);
+		for(int i=0; i<(int)zernVec.size(); ++i)
+		{
+			for(int j=0; j<(int)zernVec.at(i).size(); ++j)
+			{
+				row->InsertNextValue( vtkVariant(zernVec.at(i).at(j)) );
+			}
+		}
+		table->InsertNextRow(row);
+	}
+	return table;
+}
+
 //******************************************************************************
 // LabelImageToFeatures.h/cpp is a class similar to an ITK Filter.
 // It inherits from itk::LightObject in order to take advantage of smart pointers.
@@ -78,8 +204,6 @@ limitations under the License.
 // This class defaults to LEVEL 2 with all options set to OFF.
 //*****************************************************************************
 
-namespace ftk 
-{
 
 //Constructor
 template< typename TIPixel, typename TLPixel, unsigned int VImageDimension > 
@@ -1666,6 +1790,8 @@ std::vector<TLPixel> LabelImageToFeatures< TIPixel, TLPixel, VImageDimension>
 	}
 	return nbs;
 }
+
+
 
 } //end namespace ftk
 #endif

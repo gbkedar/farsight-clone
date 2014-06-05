@@ -326,6 +326,10 @@ bool Image::LoadStandardImage( std::string fileName, bool stacksAreForTime, bool
 	path = this->GetPath(fileName);							//Path to this image file
 	filenames.push_back( this->GetFilename(fileName) );		//Filename of this image
 
+    std::cout << "Current image size:"<<this->m_Info.numColumns<<"\t"
+    		<<this->m_Info.numRows<<"\t"<<this->m_Info.numZSlices
+		<<"\n";
+
 	return true;
 }
 

@@ -353,6 +353,8 @@ void MontageView::cropRegion()
   x2 = (((double)coordinates.at(2))*scaleFactor);
   y2 = (((double)coordinates.at(3))*scaleFactor);
 
+  std::cout<<"X1="<<x1<<"\tX2="<<x2<<"Y1="<<y1<<"\tY2="<<y2<<std::endl;
+
   if( x2>=imInfo->numColumns )
     x2 = imInfo->numColumns-1;
   if( y2>imInfo->numRows )

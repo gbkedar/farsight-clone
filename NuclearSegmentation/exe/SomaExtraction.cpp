@@ -1244,6 +1244,7 @@ void SomaExtractor::AssociateDebris(OutputImageType::Pointer inputImage, std::ve
 
 SomaExtractor::ProbImageType::Pointer SomaExtractor::GenerateSeedPoints(OutputImageType::Pointer inputImgPt, std::vector< itk::Index<3> > &somaCentroids)
 {
+	std::cout<<"Soma extractor has been disabled\n";
 	int size1 = inputImgPt->GetLargestPossibleRegion().GetSize()[0];
 	int size2 = inputImgPt->GetLargestPossibleRegion().GetSize()[1];
 	int size3 = inputImgPt->GetLargestPossibleRegion().GetSize()[2];
@@ -1262,7 +1263,7 @@ SomaExtractor::ProbImageType::Pointer SomaExtractor::GenerateSeedPoints(OutputIm
 	}
 	
 	yousef_nucleus_seg * NucleusSeg = new yousef_nucleus_seg();
-	NucleusSeg->setDataImage(in_Image, size1, size2, size3, "");
+	//NucleusSeg->setDataImage(in_Image, size1, size2, size3, "");
 	NucleusSeg->setParamsForSeedDetection(shift, scaleMin, scaleMax, regionXY, regionZ, useDistMap, sampling_ratio_XY_to_Z, minObjSize);
 	std::cout<<std::endl << "Run Binarization"<<std::endl;
 	NucleusSeg->runBinarization(num_bins);
@@ -1327,11 +1328,12 @@ SomaExtractor::ProbImageType::Pointer SomaExtractor::GenerateSeedPoints(OutputIm
 
 SomaExtractor::ProbImageType::Pointer SomaExtractor::GenerateSeedPoints( unsigned char* inputBuffer, int size1, int size2, int size3, std::vector< itk::Index<3> > &somaCentroids)
 {
+	std::cout<<"Soma extractor has been disabled\n";
 	unsigned char *in_Image = inputBuffer;
 
 	/// save binarized image as the speed image
 	yousef_nucleus_seg * NucleusSeg = new yousef_nucleus_seg();
-	NucleusSeg->setDataImage(in_Image, size1, size2, size3, "");
+//	NucleusSeg->setDataImage(in_Image, size1, size2, size3, "");
 	NucleusSeg->setParamsForSeedDetection(shift, scaleMin, scaleMax, regionXY, regionZ, useDistMap, sampling_ratio_XY_to_Z, 0);
 	std::cout<<std::endl << "Run Binarization"<<std::endl;
 	NucleusSeg->runBinarization(num_bins);

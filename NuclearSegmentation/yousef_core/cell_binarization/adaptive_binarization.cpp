@@ -1487,3 +1487,510 @@ binaryImageType::Pointer Adaptive_Binarization(inputImageType::Pointer _inputIma
 
 	return _binaryImage;
 }
+
+//2D Code ******************************************************
+#define WinSz 256	//Histogram computed on this window
+#define CWin  32	//This is half the inner window and must be a divisor of WinSz
+#define NumBins 512	//Downsampled to these number of bins
+#define HistPCMin 20.0  //Min percentage of histogram to search while updating poisson pars
+
+typedef itk::Image< unsigned short, 2 > US2ImageType;
+typedef itk::Image< unsigned short, 3 > US3ImageType;
+typedef itk::Image< unsigned char, 3 > UC3ImageType;
+typedef itk::Image< double, 2 > CostImageType;
+
+template<typename InputImageType> typename InputImageType::Pointer
+  CreateDefaultCoordsNAllocateSpace( typename InputImageType::SizeType size )
+{
+  typename InputImageType::Pointer inputImagePointer = InputImageType::New();
+  typename InputImageType::PointType origin;
+  typename InputImageType::IndexType start;
+  const int imDims = InputImageType::ImageDimension;
+  for( itk::IndexValueType i=0;
+       i<imDims; ++i )
+  {
+    origin[i] = 0; start[i] = 0;
+  }
+  typename InputImageType::RegionType region;
+  region.SetSize( size );
+  region.SetIndex( start );
+  inputImagePointer->SetOrigin( origin );
+  inputImagePointer->SetRegions( region );
+  inputImagePointer->Allocate();
+  inputImagePointer->FillBuffer(0);
+  try
+  {
+    inputImagePointer->Update();
+  }
+  catch( itk::ExceptionObject & excep )
+  {
+    std::cerr << "Exception caught in allocating space for image!" << excep << std::endl;
+    exit (EXIT_FAILURE);
+  }
+  return inputImagePointer;
+}
+
+template<typename InputImageType, typename OutputImageType> void
+RescaleCastNWriteImage
+( typename InputImageType::Pointer inputImage,
+    std::string &outFileName )
+{
+  typedef itk::RescaleIntensityImageFilter< InputImageType, OutputImageType > RescaleFilterType;
+  if( InputImageType::ImageDimension!=OutputImageType::ImageDimension )
+  {
+    std::cout<<"This function needs equal input and output dimensions";
+    return;
+  }
+  typename RescaleFilterType::Pointer rescaleFilter = RescaleFilterType::New();
+  rescaleFilter->SetInput(inputImage);
+  rescaleFilter->SetOutputMinimum( itk::NumericTraits< typename OutputImageType::PixelType >::min() );
+  rescaleFilter->SetOutputMaximum( itk::NumericTraits< typename OutputImageType::PixelType >::max() );
+  WriteITKImage< OutputImageType >( rescaleFilter->GetOutput(), outFileName );
+  return;
+}
+
+template<typename InputImageType> void WriteITKImage
+  ( typename InputImageType::Pointer inputImagePointer,
+    std::string outputName )
+{
+  typedef typename itk::ImageFileWriter< InputImageType > WriterType;
+  typename WriterType::Pointer writer = WriterType::New();
+  writer->SetFileName( outputName.c_str() );
+  writer->SetInput( inputImagePointer );
+  try
+  {
+    writer->Update();
+  }
+  catch(itk::ExceptionObject &e)
+  {
+    std::cerr << e << std::endl;
+    exit( EXIT_FAILURE );
+  }
+  return;
+}
+
+void ComputeHistogram(
+	US2ImageType::Pointer medFiltImages,
+	std::vector< double > &histogram,
+	US2ImageType::IndexType &start, US2ImageType::PixelType valsPerBin )
+{
+  typedef itk::ImageRegionConstIterator< US2ImageType > ConstIterType;
+  US2ImageType::SizeType size; size[0] = WinSz; size[1] = WinSz;
+  if( start[0]+WinSz >
+      medFiltImages->GetLargestPossibleRegion().GetSize()[0] )
+    size[0] = medFiltImages->GetLargestPossibleRegion().GetSize()[0]-start[0];
+  if( start[1]+WinSz >
+      medFiltImages->GetLargestPossibleRegion().GetSize()[1] )
+    size[1] = medFiltImages->GetLargestPossibleRegion().GetSize()[1]-start[1];
+  US2ImageType::RegionType region;
+  region.SetSize( size ); region.SetIndex( start );
+  ConstIterType constIter ( medFiltImages, region );
+  for( constIter.GoToBegin(); !constIter.IsAtEnd(); ++constIter )
+  {
+    itk::SizeValueType currentBin = (itk::SizeValueType) 
+		std::floor((double)constIter.Get()/(double)valsPerBin);
+    if( histogram.size() <= currentBin ) currentBin = histogram.size()-1;
+    ++histogram[currentBin];
+  }
+  double normalizeFactor = ((double)WinSz)*((double)WinSz);
+  for( itk::SizeValueType j=0; j<histogram.size(); ++j )
+  {
+    histogram.at(j) /= normalizeFactor;
+  }
+  return;
+}
+
+void UpdateHistogram(
+	US2ImageType::Pointer medFiltImages, std::vector< double > &histogram,
+	US2ImageType::IndexType &start, US2ImageType::IndexType &prevStart,
+	US3ImageType::PixelType valsPerBin )
+{
+  typedef itk::ImageRegionConstIterator< US2ImageType > ConstIterType;
+  double pixelContrib = 1.00/(((double)WinSz)*((double)WinSz));
+  //Remove the previous col from the histogram
+  US2ImageType::IndexType startRem, startAdd;
+  startRem[0] = prevStart[0]; startRem[1] = prevStart[1];
+  US2ImageType::SizeType size;
+  size[0] = start[0]-prevStart[0]; size[1] = start[1]-prevStart[1];
+  US2ImageType::RegionType RemRegion, AddRegion;
+  RemRegion.SetSize( size ); RemRegion.SetIndex( startRem );
+  ConstIterType constIterRem ( medFiltImages, RemRegion );
+  for( constIterRem.GoToBegin(); !constIterRem.IsAtEnd(); ++constIterRem )
+  {
+    itk::SizeValueType currentBin = (itk::SizeValueType) 
+		std::floor((double)constIterRem.Get()/(double)valsPerBin);
+    if( histogram.size() <= currentBin ) currentBin = histogram.size()-1;
+    histogram[currentBin] -= pixelContrib;
+  }
+  startAdd[0] = start[0]; startAdd[1] = start[1]+WinSz-size[1];
+  AddRegion.SetSize( size ); AddRegion.SetIndex( startAdd );
+  ConstIterType constIterAdd ( medFiltImages, AddRegion );
+  for( constIterAdd.GoToBegin(); !constIterAdd.IsAtEnd(); ++constIterAdd )
+  {
+    itk::SizeValueType currentBin = (itk::SizeValueType) 
+		std::floor((double)constIterAdd.Get()/(double)valsPerBin);
+    if( histogram.size() <= currentBin ) currentBin = histogram.size()-1;
+    histogram[currentBin] += pixelContrib;
+  }
+  for( itk::SizeValueType i=0; i<histogram.size(); ++i ) 
+    if( histogram.at(i) < pixelContrib ) histogram.at(i) = 0;
+  return;
+}
+
+void computePoissonParams( std::vector< double > &histogram,
+			   std::vector< double > &parameters, bool firstPass
+			   )
+{
+  itk::SizeValueType max = histogram.size()-1;
+  //The three-level min error thresholding algorithm
+  double min_J = std::numeric_limits<double>::max();
+  double P0, U0, P1, U1, U, J;
+  // Try this: we need to define a penalty term that depends on the number of parameters
+  //The penalty term is given as 0.5*k*ln(n)
+  //where k is the number of parameters of the model and n is the number of samples
+  double pc5=0, histPc=0;
+  for( itk::SizeValueType i=0; i<histogram.size(); ++i )
+  {
+    histPc += histogram.at(i);
+    if( histPc > 0.05 )
+    {
+      pc5 = i;
+      break;
+    }
+  }
+  if( pc5<1 ) pc5 = 1;
+
+  itk::SizeValueType min_i, max_i;
+  if( firstPass )
+  {
+    min_i = pc5;
+    max_i = max;
+  }
+  else
+  {
+    double histPcChange = 2.0/WinSz*100;
+    if( histPcChange<HistPCMin ) histPcChange=HistPCMin;
+    histPcChange = std::ceil(histPcChange/100.0*((double)histogram.size()));
+    min_i = (parameters.at(0)-histPcChange)<pc5 ? pc5 : (parameters.at(0)-histPcChange);
+    max_i = (parameters.at(0)+histPcChange)>max ?
+		max : (parameters.at(0)+histPcChange);
+    if( parameters.at(2)>0.90 )//The window was in the background, estimate may be skewed
+    {
+      min_i = pc5;
+      max_i = max;
+    }
+  }
+
+  //Two level
+  //The penalty term is given as sqrt(k)*ln(n)
+  //In this case, k=4 and n=histogram.size()
+  double PenTerm2 = 4.0*log(((double)(max+1)));
+  for( itk::SizeValueType i=min_i; i<max_i; ++i )//to set the first threshold
+  {
+    //compute the current parameters of the first component
+    P0 = U0 = 0.0;
+    for( itk::SizeValueType l=0; l<=i; ++l )
+    {
+      P0 += histogram.at(l);
+      U0 += (l+1)*histogram.at(l);
+    }
+    U0 /= P0;
+
+    for( itk::SizeValueType j=i+1; j<max; ++j )//to set the second threshold
+    {
+      //compute the current parameters of the second component
+      U1 = 0.0;
+      P1 = 1-P0;
+      for( itk::SizeValueType l=j; l<=max; ++l )
+        U1 += (l+1)*histogram.at(l);
+      U1 /= P1;
+
+      //compute the overall mean
+      U = P0*U0 + P1*U1;
+
+      //Compute the current value of the error criterion function
+      J = U - (P0*(log(P0)+U0*log(U0))+ P1*(log(P1)+U1*log(U1)));
+      //Add the penalty term
+      J += PenTerm2;
+
+      if( J<min_J )
+      {
+        min_J = J;
+        parameters.at(0) = U0; //Lowest mean
+        parameters.at(1) = U1; //Intermediate mean
+        parameters.at(2) = P0; //Prior for the lowest
+        parameters.at(3) = P1; //Prior for the highest
+      }
+    }
+  }
+  return;
+}
+
+//Intialize pdf vector with max_intensity+1, 1
+double ComputePoissonProbability(double intensity, double alpha)
+{
+	/*this is the equation
+	P = (alpha^intensity)*exp(-alpha)/factorial(intensity);*/
+	double A, P;
+	A = std::exp(-alpha);
+	P = 1;
+	for (US2ImageType::PixelType i=1; i<= intensity; ++i)
+		P = P * (alpha/i);
+	P = P*A;
+	if(P < std::numeric_limits<double>::epsilon())
+		P = std::numeric_limits<double>::epsilon();
+	return P;
+}
+
+void ComputeCosts( US2ImageType::Pointer  medFiltImages,
+		   CostImageType::Pointer flourCosts,
+		   CostImageType::Pointer flourCostsBG,
+		   US2ImageType::PixelType valsPerBin
+		   )
+{
+  typedef itk::ImageRegionConstIterator< US2ImageType > ConstIterType;
+  typedef itk::ImageRegionIterator< CostImageType > CostIterType;
+  typedef itk::ImageRegionIterator< US3ImageType > IterTypeUS3d;
+  itk::IndexValueType numCol =  medFiltImages->
+				GetLargestPossibleRegion().GetSize()[1];
+  itk::IndexValueType numRow =  medFiltImages->
+				GetLargestPossibleRegion().GetSize()[0];
+  itk::IndexValueType WinSz2 = (itk::IndexValueType)floor(((double)WinSz)/2+0.5)
+			      -(itk::IndexValueType)floor(((double)CWin)/2+0.5);
+  //WinSz2*2+CWin defines the whole window
+  itk::IndexValueType WinSzHalf = (itk::IndexValueType)floor(((double)WinSz)/2+0.5);
+
+  for( itk::IndexValueType i=0; i<numRow; i+=CWin )
+  { 
+    std::vector< double > parameters( 4, 0 );
+    //std::vector< double > histogram( NumBins, 0 );
+    US2ImageType::IndexType prevStart; prevStart[0] = 0; prevStart[1] = 0;
+    for( itk::IndexValueType j=0; j<numCol; j+=CWin )
+    {
+    std::vector< double > histogram( NumBins, 0 );
+      //Compute histogram at point i,j with window size define WinSz
+      US2ImageType::IndexType curPoint; curPoint[0] = i; curPoint[1] = j;
+      US2ImageType::IndexType start; start[0] = i-WinSz2; start[1] = j-WinSz2;
+      if( (start[0]+WinSz)>=numRow ) start[0] =  numRow-WinSz-1;
+      if( (start[1]+WinSz)>=numCol ) start[1] =  numCol-WinSz-1;
+      if( start[0]<0 ) start[0] = 0; if( start[1]<0 ) start[1] = 0;
+      if( j==0 )
+      {
+        ComputeHistogram( medFiltImages, histogram, start, valsPerBin );
+	computePoissonParams( histogram, parameters, true );
+      }
+      else if( (start[1]!=prevStart[1]) || (start[0]!=prevStart[0]) )
+      {
+        ComputeHistogram( medFiltImages, histogram, start, valsPerBin );
+	//UpdateHistogram( medFiltImages, histogram, start, prevStart, valsPerBin );
+	computePoissonParams( histogram, parameters, false );
+      }
+      prevStart[0] = start[0]; prevStart[1] = start[1];
+
+	//Declare iterators for the two cost images
+	US2ImageType::SizeType size; size[0] = CWin; size[1] = CWin;
+	if( (i+CWin)>=numRow ) size[0] = numRow-i-1;
+	if( (j+CWin)>=numCol ) size[1] = numCol-j-1;
+	US2ImageType::RegionType region;
+	region.SetSize( size ); region.SetIndex( curPoint );
+	ConstIterType constIter ( medFiltImages, region );
+	CostIterType costIterFlour	( flourCosts,	region );
+	CostIterType costIterFlourBG	( flourCostsBG,	region );
+	constIter.GoToBegin(); costIterFlour.GoToBegin(); costIterFlourBG.GoToBegin();
+	for( ; !constIter.IsAtEnd(); ++constIter, ++costIterFlour, ++costIterFlourBG )
+	{
+	  itk::SizeValueType currentPixel = (US2ImageType::PixelType)std::floor
+						( ((double)constIter.Get())/((double)valsPerBin) );
+
+	  //Compute node costs for each type
+	  double F, FBG;
+	  if( currentPixel < 1 ) currentPixel = 1;
+	  if( (parameters.at(1)-parameters.at(0))<1 )//|| currentPixel < 1 )
+	  {
+	    FBG = 10000.0;
+	    F   = 0;
+	  }
+	  else
+	  {
+	    if( currentPixel >= parameters.at(1) )
+	      F  =  parameters.at(3)*ComputePoissonProbability(parameters.at(1),
+	    							parameters.at(1));
+	    else
+	      F  =  parameters.at(3)*ComputePoissonProbability(currentPixel,
+	    							parameters.at(1));
+	    if( currentPixel <= parameters.at(0) )
+	      FBG = parameters.at(2)*ComputePoissonProbability(parameters.at(0),
+	    							parameters.at(0));
+	    else
+	      FBG = parameters.at(2)*ComputePoissonProbability(currentPixel,
+	    							parameters.at(0));
+	      F    = -log( F    ); if( F    > 10000.0 ) F    = 10000.0;
+	      FBG  = -log( FBG  ); if( FBG  > 10000.0 ) FBG  = 10000.0;
+	  }
+	  /*CostImageType::IndexType curInd = costIterFlour.GetIndex();
+	  if( curInd[1] == 0  && curInd[0]>1120 && curInd[0]<1128 )
+	  {
+	    std::cout<<"FGC="<<F<<" BGC="<<FBG<<" MuB="<<parameters.at(0)
+	    	<<" MuF="<<parameters.at(1)<<" PB="<<parameters.at(2)
+		<<" PF="<<parameters.at(3)<<std::endl;
+	  }*/
+	  costIterFlour.Set( F ); costIterFlourBG.Set( FBG );
+        }
+    }
+  }
+  return;
+}
+
+void ComputeCut( US2ImageType::Pointer  medFiltImages,
+		 CostImageType::Pointer flourCosts,
+		 CostImageType::Pointer flourCostsBG,
+		 UC3ImageType::Pointer outputImage,
+		 UC3ImageType::PixelType foregroundValue
+		)
+{
+  double sigma = 25.0; //What! A hard coded constant check Boykov's paper!! Also check 20 in weights
+  double neighWt = 80.0;
+  typedef itk::ImageRegionIteratorWithIndex< CostImageType > CostIterType;
+  typedef itk::ImageRegionIteratorWithIndex< US2ImageType > US2IterType;
+  typedef itk::ImageRegionIteratorWithIndex< UC3ImageType > UC3IterType;
+  //Compute the number of nodes and edges
+  itk::SizeValueType numRow   = medFiltImages->GetLargestPossibleRegion().GetSize()[0];
+  itk::SizeValueType numCol   = medFiltImages->GetLargestPossibleRegion().GetSize()[1];
+  itk::SizeValueType numNodes = numCol*numRow;
+  itk::SizeValueType numEdges = 3*numCol*numRow //Down, right and diagonal
+  				+ 1 - 2*numCol	//No Down At Bottom
+				- 2*numRow;	//No Right At Edge
+  //Declare some common iterators
+  US2IterType medianIter( medFiltImages,
+  			  medFiltImages->GetLargestPossibleRegion() );
+  CostIterType AFCostIter( flourCosts, 
+  			   flourCosts->GetLargestPossibleRegion() );
+  CostIterType AFBGCostIter( flourCostsBG, 
+  			     flourCostsBG->GetLargestPossibleRegion() );
+  UC3ImageType::IndexType start;start[0] = 0;	  start[1] = 0;	    start[2] = 0;
+  UC3ImageType::SizeType size;   size[0] = numRow; size[1] = numCol; size[2] = 1;
+  UC3ImageType::RegionType region; region.SetSize( size ); region.SetIndex( start );
+  UC3IterType outputIter( outputImage, region );
+  typedef Graph_B < double, double, double > GraphType;
+  GraphType *graph = new GraphType( numNodes, numEdges );
+  //Iterate and add terminal weights
+  for( itk::SizeValueType i=0; i<numRow; ++i )
+  {
+    for( itk::SizeValueType j=0; j<numCol; ++j )
+    {
+      CostImageType::IndexType index; index[0] = i; index[1] = j;
+      AFCostIter.SetIndex( index ); AFBGCostIter.SetIndex( index );
+      itk::SizeValueType indexCurrentNode = i*numCol+j; 
+      graph->add_node();
+      graph->add_tweights( indexCurrentNode, //rand()%100, rand()%100 );//Testing
+			AFCostIter.Get(), AFBGCostIter.Get() );
+    }
+  }
+  for( itk::SizeValueType i=0; i<numRow-1; ++i )
+  {
+    for( itk::SizeValueType j=0; j<numCol-1; ++j )
+    {
+      US2ImageType::IndexType index; index[0] = i; index[1] = j; medianIter.SetIndex( index );
+      double currentVal = medianIter.Get();
+      //Intensity discontinuity terms as edges as done in Yousef's paper
+      itk::SizeValueType indexCurrentNode  = i*numCol+j;
+      itk::SizeValueType indexRightNode    = indexCurrentNode+1;
+      itk::SizeValueType indexBelowNode    = indexCurrentNode+numCol;
+      itk::SizeValueType indexDiagonalNode = indexBelowNode+1;
+      //Right
+      index[0] = i; index[1] = j+1; medianIter.SetIndex( index );
+      double rightCost = neighWt*exp(-pow(currentVal-medianIter.Get(),2)/(2*pow(sigma,2)));
+      graph->add_edge( indexCurrentNode, indexRightNode, rightCost, rightCost );
+      //Below
+      index[0] = i+1; index[1] = j; medianIter.SetIndex( index );
+      double downCost = neighWt*exp(-pow(currentVal-medianIter.Get(),2)/(2*pow(sigma,2)));
+      graph->add_edge( indexCurrentNode, indexBelowNode, downCost, downCost );
+      //Diagonal
+      index[0] = i+1; index[1] = j+1; medianIter.SetIndex( index );
+      double diagonalCost = neighWt*exp(-pow(currentVal-medianIter.Get(),2)/(2*pow(sigma,2)));
+      graph->add_edge( indexCurrentNode, indexDiagonalNode, diagonalCost, diagonalCost );
+    }
+  }
+  //Max flow:
+  graph->maxflow();
+
+  //Iterate and write out the pixels
+  for( itk::SizeValueType i=0; i<numRow-1; ++i )
+  {
+    for( itk::SizeValueType j=0; j<numCol-1; ++j )
+    {
+      UC3ImageType::IndexType index; index[0] = i; index[1] = j; index[2] = 0;
+      outputIter.SetIndex( index );
+      itk::SizeValueType indexCurrentNode = i*numCol+j;
+      if( graph->what_segment( indexCurrentNode ) != GraphType::SOURCE )
+	outputIter.Set( foregroundValue );
+    }
+  }
+  delete graph;
+}
+
+US2ImageType::Pointer Get2DFrom3D( US3ImageType::Pointer readImage )
+{
+  typedef itk::ExtractImageFilter< US3ImageType, US2ImageType > DataExtractType;
+  DataExtractType::Pointer deFilter = DataExtractType::New();
+  US3ImageType::RegionType dRegion  = readImage->GetLargestPossibleRegion();
+  dRegion.SetSize (2,0);
+  dRegion.SetIndex(2,0);
+  deFilter->SetExtractionRegion(dRegion);
+  deFilter->SetDirectionCollapseToIdentity();
+  deFilter->SetInput( readImage );
+  try
+  {
+    deFilter->Update();
+  }
+  catch( itk::ExceptionObject & excep )
+  {
+    std::cerr << "Exception caught in slice extraction filter!" << excep << std::endl;
+    exit (EXIT_FAILURE);
+  }
+  US2ImageType::Pointer d2Im = deFilter->GetOutput();
+  return d2Im;
+}
+
+UC3ImageType::Pointer AdaptiveBinarization2D( US3ImageType::Pointer inputImage3d )
+{
+  typedef itk::ImageRegionConstIterator< US2ImageType > ConstIterType;
+
+  US2ImageType::Pointer inputImage = Get2DFrom3D( inputImage3d );
+  UC3ImageType::SizeType size3d;
+  US2ImageType::SizeType size;
+  size3d[0] = size[0] = inputImage->GetLargestPossibleRegion().GetSize()[0];
+  size3d[1] = size[1] = inputImage->GetLargestPossibleRegion().GetSize()[1];
+  size3d[2] = 1;
+
+  double valsPerBinDbl = -1;
+
+  //Get max pixel val
+  ConstIterType medianIter( inputImage, inputImage->GetLargestPossibleRegion() );
+  for( medianIter.GoToBegin(); !medianIter.IsAtEnd(); ++medianIter )
+    if( medianIter.Get() > valsPerBinDbl )
+      valsPerBinDbl = medianIter.Get();
+  valsPerBinDbl /= (double)NumBins;
+  valsPerBinDbl = std::floor( valsPerBinDbl+0.5 );
+
+  CostImageType::Pointer flourCosts   =
+			CreateDefaultCoordsNAllocateSpace<CostImageType>( size );
+  CostImageType::Pointer flourCostsBG =
+			CreateDefaultCoordsNAllocateSpace<CostImageType>( size );
+  UC3ImageType::Pointer labelImage =
+			CreateDefaultCoordsNAllocateSpace<UC3ImageType>( size3d );
+
+  ComputeCosts( inputImage, flourCosts, flourCostsBG,
+  					(US2ImageType::PixelType)valsPerBinDbl );
+  ComputeCut( inputImage, flourCosts, flourCostsBG, labelImage,
+			std::numeric_limits<UC3ImageType::PixelType>::max() );
+/*
+  std::string nameFg = "bfg.tif";
+  std::string nameBg = "bbg.tif";
+  std::string nameBn = "bin.tif";
+  RescaleCastNWriteImage< CostImageType, US2ImageType>( flourCosts, nameFg );
+  RescaleCastNWriteImage< CostImageType, US2ImageType>( flourCostsBG, nameBg );
+  RescaleCastNWriteImage< UC3ImageType, UC3ImageType>( labelImage, nameBn );*/
+
+  return labelImage;
+}

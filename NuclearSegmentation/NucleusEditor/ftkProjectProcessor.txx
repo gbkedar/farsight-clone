@@ -5,7 +5,7 @@ template <typename InputPixelType, typename LabelPixelType>  void
 {
 	typedef typename itk::Image< InputPixelType, 3 > InputImageType;
 	//The computation engine assumes 8-bit images and till it is fixed
-	typedef typename itk::Image< unsigned char,  3 > InputImageType1;
+	typedef typename itk::Image< unsigned short,  3 > InputImageType1;
 	typedef typename itk::Image< LabelPixelType, 3 > LabelImageType1;
 	typedef typename itk::RegionOfInterestImageFilter
 				< InputImageType, InputImageType1 > ROIFilterType;
@@ -44,6 +44,15 @@ template <typename InputPixelType, typename LabelPixelType>  void
 		std::cerr << "Error in montage compute stats:"<< excp << std::endl;
 	}
 
+/*	for( LabelPixelType i=0;  i<100; ++i )
+	{
+	  typename LabelStatisticsImageFilterType::BoundingBoxType BoundBox;
+	  BoundBox = LabelStatisticsImageFilter->GetBoundingBox( i );
+	  std::cout<<BoundBox[0]<<" "<<BoundBox[1]<<"\t"
+		<<BoundBox[2]<<" "<<BoundBox[3]<<"\t"
+		<<BoundBox[4]<<" "<<BoundBox[5]<<"\n";
+	}
+*/
 	std::vector< std::string > SNames;
 	//Compute features for one image and get the names of the features that are turned on
 	{
@@ -96,7 +105,7 @@ template <typename InputPixelType, typename LabelPixelType>  void
 		std::vector<unsigned char> color;
 		color.assign(3,255);
 		IImage->AppendChannelFromData3D( (void*)CroppedImage->GetBufferPointer(),
-				 itk::ImageIOBase::UCHAR, sizeof(unsigned char),
+				 itk::ImageIOBase::USHORT, sizeof(unsigned short),
 				 CCSize[0], CCSize[1], CCSize[2], "nuc", color, true); 
 		OImage->AppendChannelFromData3D( (void*)CroppedImage->GetBufferPointer(),
 				itk::ImageIOBase::USHORT, sizeof(unsigned short),
@@ -128,6 +137,8 @@ template <typename InputPixelType, typename LabelPixelType>  void
 			FVector.at(LabelIndex).resize(SNames.size());
 	std::sort( labelsList.begin(), labelsList.end() );
 	std::cout<<"Found "<<labelsList.size()<<" labels for computing features\n"<<std::flush;
+	std::cout<<"Allocated "<<FVector.size()<<" label vecs for computing features\n"<<std::flush;
+	std::cout<<"Computing "<<SNames.size()<<" features per cell\n"<<std::flush;
 
 #ifdef _OPENMP
 	//Use 95% of the cores by default n save a little for the OS
@@ -226,7 +237,7 @@ template <typename InputPixelType, typename LabelPixelType>  void
 		std::vector<unsigned char> color;
 		color.assign(3,255);
 		IImage->AppendChannelFromData3D( (void*)CIImage->GetBufferPointer(),
-			itk::ImageIOBase::UCHAR, sizeof(unsigned char),
+			itk::ImageIOBase::USHORT, sizeof(unsigned short),
 			CCSize[0], CCSize[1], CCSize[2], "nuc", color, true); 
 		OImage->AppendChannelFromData3D( (void*)CroppedImage->GetBufferPointer(),
 			itk::ImageIOBase::USHORT, sizeof(unsigned short),
@@ -240,10 +251,9 @@ template <typename InputPixelType, typename LabelPixelType>  void
 			FVector.at(i).at(j) = CCtable->GetValue(0,j).ToDouble();
 
 		//Change the id, centroid_x, centroid_y and centroid_z
-		FVector.at(i).at(0) = LabelIndex;
-		FVector.at(i).at(1) += CCStart[0];
-		FVector.at(i).at(2) += CCStart[1];
-		FVector.at(i).at(3) += CCStart[2];
+		for( vtkIdType j=0; j<4; ++j )
+		  if( !j ) FVector.at(i).at(j) = LabelIndex;
+		  else FVector.at(i).at(j) += CCStart[j-1];
 		delete iCalc;
 	}
 	std::cout<<"Features done. Populating table...\n"<<std::flush;
@@ -298,17 +308,18 @@ template <typename LabelPixelType>  void
 
   itk::SizeValueType NumFilesToStitch = TempSegFiles.size()-1; //Binary appended at the end
   LabelPixelType NumLabelsUsed = 1;
-#ifdef _OPENMP
-   #pragma omp parallel for num_threads(n_thr) \
-   shared( TempSegFiles, OutputLabelImage, NumLabelsUsed )
-#if _OPENMP >= 200805L
+  int stitch_num_thr = 5 < n_thr ? 5 : n_thr;
+//#ifdef _OPENMP
+//   #pragma omp parallel for num_threads(stitch_num_thr) \
+//   shared( TempSegFiles, OutputLabelImage, NumLabelsUsed )
+//#if _OPENMP >= 200805L
   for( typename OutputLabelsType::PixelType i=0; i<NumFilesToStitch; ++i )
-#else
-  for( itk::IndexValueType i=0; i<NumFilesToStitch; ++i )
-#endif
-#else
-  for( LabelPixelType i=0; i<NumFilesToStitch; ++i )
-#endif
+//#else
+//  for( itk::IndexValueType i=0; i<NumFilesToStitch; ++i )
+//#endif
+//#else
+//  for( LabelPixelType i=0; i<NumFilesToStitch; ++i )
+//#endif
   {
     std::string CurrentFilename = ftk::GetFilenameFromFullPath( TempSegFiles.at(i) );
     //Get the offset from the filename
@@ -352,7 +363,9 @@ template <typename LabelPixelType>  void
       std::vector< LabelImageType::IndexType > LabelPixels = LabelGeometryFilter->GetPixelIndices(labelValue);
       LabelPixelType CurrentMontageLabel;
 #pragma omp critical
+      {
 	CurrentMontageLabel = NumLabelsUsed++;
+      }
       std::vector< LabelImageType::IndexType >::iterator it;
       for( it=LabelPixels.begin(); it!=LabelPixels.end(); ++it )
       {
@@ -372,15 +385,8 @@ template <typename LabelPixelType>  void
       std::cout << "Error in removing file. " << ex.what() << '\n';
     }
   }
-  //Remove binary
-  boost::filesystem::path RemoveFile = TempSegFiles.back().c_str();
-  try{ boost::filesystem::remove( RemoveFile ); }
-  catch( const boost::filesystem::filesystem_error& ex )
-  {
-    std::cout << "Error in removing file. " << ex.what() << '\n';
-  }
-
-#if 0
+ 
+#if 1
   typedef itk::ImageFileWriter< OutputLabelsType > CCWriterType;
   typename CCWriterType::Pointer ccwriter = CCWriterType::New();
   ccwriter->SetInput( OutputLabelImage );
@@ -389,6 +395,14 @@ template <typename LabelPixelType>  void
   try{ ccwriter->Update(); }
   catch( itk::ExceptionObject & excp ){ std::cerr << excp << std::endl; }
 #endif
+
+ //Remove binary
+  boost::filesystem::path RemoveFile = TempSegFiles.back().c_str();
+  try{ boost::filesystem::remove( RemoveFile ); }
+  catch( const boost::filesystem::filesystem_error& ex )
+  {
+    std::cout << "Error in removing file. " << ex.what() << '\n';
+  }
 
   //All files are done delete folder
   std::string TempFolder = ftk::GetFilePath( TempSegFiles.at(0) );

@@ -68,7 +68,7 @@ int Cell_Binarization_2D(unsigned char* imgIn, unsigned short *imgOut, int R, in
 }
 
 //Main function for 3-D binarization
-int Cell_Binarization_3D(unsigned char *imgIn, unsigned short* imgOut, int R, int C, int Z, int shd, int div, unsigned short number_of_bins, float alpha_F, float alpha_B, float P_I) //modifed by Yousef on 5-20-2008.. The first input change from uchar* to int*
+int Cell_Binarization_3D(unsigned short *imgIn, unsigned short* imgOut, int R, int C, int Z, int shd, int div, unsigned short number_of_bins, float alpha_F, float alpha_B, float P_I) //modifed by Yousef on 5-20-2008.. The first input change from uchar* to int*
 {			
 	//Now, to do the binarization, follow these steps:
 	//1- Assuming that the histogram of the image is modeled by a mixture of two 
@@ -744,7 +744,7 @@ void CompMixPoss3D(unsigned char* img, float* alpha_B, float* alpha_A, float* P_
 
 }
 
-void MinErrorThresholding(unsigned char* img, float* alpha_B, float* alpha_A, float* P_I, size_t R, size_t C, size_t Z, int shiftDown, unsigned short *imgOut, unsigned short number_of_bins)
+void MinErrorThresholding(unsigned short* img, float* alpha_B, float* alpha_A, float* P_I, size_t R, size_t C, size_t Z, int shiftDown, unsigned short *imgOut, unsigned short number_of_bins)
 {
 	typedef  short  InputPixelType;
 	typedef  short  OutputPixelType;
@@ -851,7 +851,7 @@ void MinErrorThresholding(unsigned char* img, float* alpha_B, float* alpha_A, fl
 }
 
 
-void Seg_GC_Full_3D_Blocks(unsigned char* IM, size_t r, size_t c, size_t z, double alpha_F, double alpha_B, double P_I, unsigned short* Seg_out, long long* imBlock)
+void Seg_GC_Full_3D_Blocks(unsigned short* IM, size_t r, size_t c, size_t z, double alpha_F, double alpha_B, double P_I, unsigned short* Seg_out, long long* imBlock)
 {   
 	size_t nbr_node;
 	double Dn, sig, w;

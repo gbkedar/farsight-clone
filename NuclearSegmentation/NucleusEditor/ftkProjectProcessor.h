@@ -66,12 +66,12 @@ class ProjectProcessor
 {
 public:
 
-	typedef unsigned char IPixelT;
+	typedef unsigned short IPixelT;
 	typedef unsigned short LPixelT;
 	typedef itk::Image<unsigned short, 3> LabelImageType;
-	typedef itk::Image<unsigned char,  3> InputImageType1;
+	typedef itk::Image<unsigned short,  3> InputImTypeUShort3;
 	typedef itk::Image<unsigned int,   3> LabelImageType1;
-	typedef itk::LabelStatisticsImageFilter< InputImageType1, LabelImageType1 >::BoundingBoxType BBoxType;
+	typedef itk::LabelStatisticsImageFilter< InputImTypeUShort3, LabelImageType1 >::BoundingBoxType BBoxType;
 
 	typedef struct { ftk::ProjectDefinition::TaskType type; int inputChannel1; int inputChannel2; int inputChannel3; bool done; } Task;
 	ProjectProcessor();
@@ -105,15 +105,15 @@ protected:
 	//Functions for segmenting nuclei in montages
 #ifdef PROJPROC_WITH_MONT_SEG
 	void SegmentNucleiMontage( int nucChannel );
-	void BinarizeTile( InputImageType1::Pointer InputImage, InputImageType1::Pointer BinaryImage,
-			   InputImageType1::IndexType Start, InputImageType1::SizeType Size, std::string Temp);
-	std::vector< BBoxType > ReSegmentCCs( InputImageType1::Pointer InputImage,
+	void BinarizeTile( InputImTypeUShort3::Pointer InputImage, InputImTypeUShort3::Pointer BinaryImage,
+			   InputImTypeUShort3::IndexType Start, InputImTypeUShort3::SizeType Size, std::string Temp);
+	std::vector< BBoxType > ReSegmentCCs( InputImTypeUShort3::Pointer InputImage,
 						LabelImageType1::Pointer CCImage,
 						std::vector< std::string >& SegOutFilenames,
 						std::vector<LabelImageType1::PixelType>& labelsList,
 						std::string TempFolder, unsigned MaxScale,
 						itk::SizeValueType& NumberOfCells );
-	std::string SegmentNucleiInBBox( InputImageType1::Pointer InputImage, LabelImageType1::Pointer CCImage,
+	std::string SegmentNucleiInBBox( InputImTypeUShort3::Pointer InputImage, LabelImageType1::Pointer CCImage,
 					 BBoxType BBox, unsigned MaxScale,
 					 LabelImageType1::PixelType CurrentBBLabel, std::string TempFolder,
 					 LabelImageType1::PixelType& NumCells,
